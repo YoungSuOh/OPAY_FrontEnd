@@ -1,0 +1,147 @@
+.product-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.product-header {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.1);
+}
+
+.product-title {
+  color: var(--sky-blue-800);
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.product-rating {
+  font-size: 1.1rem;
+  color: #f59e0b;
+  margin-bottom: 1rem;
+}
+
+.product-price-large {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--sky-blue-600);
+  margin-bottom: 1rem;
+}
+
+.product-description {
+  color: #64748b;
+  font-size: 1.1rem;
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+
+.product-stock {
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+.product-actions-section {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.1);
+}
+
+.reviews-section {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.1);
+}
+
+.section-title {
+  color: var(--sky-blue-800);
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+}
+
+.reviews-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.review-item {
+  padding: 1.5rem;
+  background: var(--sky-blue-50);
+  border-radius: 8px;
+  border-left: 4px solid var(--sky-blue-600);
+}
+
+.review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.review-user {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.review-rating {
+  color: #f59e0b;
+  font-size: 0.9rem;
+}
+
+.review-date {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.review-content {
+  color: var(--sky-blue-800);
+  line-height: 1.6;
+  margin-bottom: 0.75rem;
+}
+
+.review-images {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.review-images img {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.review-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.review-actions button {
+  padding: 0.25rem 0.75rem;
+  background: var(--sky-blue-600);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.review-actions button:hover {
+  background: var(--sky-blue-700);
+}
+
+.load-more-container {
+  display: flex;
+  justify-content: center;
+  padding: 2rem;
+}

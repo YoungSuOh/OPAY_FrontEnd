@@ -1,0 +1,276 @@
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--sky-blue-800);
+  margin: 0;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.modal-close-btn:hover {
+  background: #f1f5f9;
+  color: var(--sky-blue-800);
+}
+
+.modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.address-section {
+  margin-bottom: 2rem;
+}
+
+.address-section:last-child {
+  margin-bottom: 0;
+}
+
+.address-section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--sky-blue-800);
+  margin-bottom: 1rem;
+}
+
+.address-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.address-item {
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: white;
+}
+
+.address-item:hover {
+  border-color: var(--sky-blue-300);
+  background: var(--sky-blue-50);
+}
+
+.address-item.selected {
+  border-color: var(--sky-blue-600);
+  background: var(--sky-blue-50);
+}
+
+.address-item.default {
+  border-color: var(--sky-blue-400);
+  background: linear-gradient(to right, var(--sky-blue-50), white);
+}
+
+.address-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.address-item-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.address-name {
+  font-weight: 600;
+  color: var(--sky-blue-800);
+  font-size: 0.95rem;
+}
+
+.address-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.default-badge {
+  background: var(--sky-blue-600);
+  color: white;
+}
+
+.address-item-header input[type="radio"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--sky-blue-600);
+  cursor: pointer;
+}
+
+.address-item-body {
+  margin-bottom: 0.75rem;
+}
+
+.address-recipient {
+  font-size: 0.9rem;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+}
+
+.address-full {
+  font-size: 0.9rem;
+  color: var(--sky-blue-800);
+  line-height: 1.5;
+}
+
+.address-item-actions {
+  padding-top: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.set-default-btn {
+  background: none;
+  border: 1px solid var(--sky-blue-300);
+  color: var(--sky-blue-600);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.set-default-btn:hover {
+  background: var(--sky-blue-50);
+  border-color: var(--sky-blue-400);
+}
+
+.modal-footer {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* 배송지 추가 폼 */
+.address-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--sky-blue-800);
+}
+
+.form-group input[type="text"],
+.form-group input[type="tel"] {
+  padding: 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="tel"]:focus {
+  outline: none;
+  border-color: var(--sky-blue-600);
+}
+
+.postal-code-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.postal-code-group input {
+  flex: 1;
+}
+
+.search-postal-btn {
+  background: var(--sky-blue-600);
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.search-postal-btn:hover {
+  background: var(--sky-blue-700);
+}
+
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.checkbox-group input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--sky-blue-600);
+  cursor: pointer;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.form-actions button {
+  flex: 1;
+}

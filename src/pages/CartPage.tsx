@@ -1,0 +1,418 @@
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useCartStore } from '../store/cartStore'
+import { Product, CartItem, ShippingAddress } from '../types'
+import Button from '../components/Button'
+import CartButton from '../components/CartButton'
+import AddressModal from '../components/AddressModal'
+import Header from '../components/Header'
+import './CartPage.css'
+
+// 샘플 상품 데이터 (실제로는 API에서 가져옴)
+const SAMPLE_PRODUCTS: Product[] = [
+  {
+    id: '1',
+    name: '프리미엄 플랜',
+    description: '모든 기능을 사용할 수 있는 프리미엄 플랜입니다.',
+    price: 9900,
+    stock: 100,
+    averageRating: 5.0,
+    reviewCount: 7,
+    category: '플랜',
+  },
+  {
+    id: '2',
+    name: '베이직 플랜',
+    description: '기본 기능을 사용할 수 있는 베이직 플랜입니다.',
+    price: 4900,
+    stock: 50,
+    averageRating: 4.8,
+    reviewCount: 4475,
+    category: '플랜',
+  },
+  {
+    id: '3',
+    name: '스타터 플랜',
+    description: '시작하기 좋은 스타터 플랜입니다.',
+    price: 2900,
+    stock: 30,
+    averageRating: 4.8,
+    reviewCount: 630,
+    category: '플랜',
+  },
+]
+
+const CartPage = () => {
+  const navigate = useNavigate()
+  const { localCart, updateQuantity, removeFromCart, isSyncing } = useCartStore()
+  const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
+  const [selectAll, setSelectAll] = useState(true)
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false)
+  const [addresses, setAddresses] = useState<ShippingAddress[]>([
+    {
+      id: '1',
+      name: '집',
+      recipient: '오영수',
+      phone: '010-1234-5678',
+      address: '경기도 성남시 분당구 발이봉남로31번길 10',
+      detailAddress: '3층',
+      postalCode: '13558',
+      isDefault: true,
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: '2',
+      name: '회사',
+      recipient: '오영수',
+      phone: '010-1234-5678',
+      address: '서울시 강남구 테헤란로 123',
+      detailAddress: '10층',
+      postalCode: '06142',
+      isDefault: false,
+      createdAt: new Date().toISOString(),
+    },
+  ])
+  const [selectedAddressId, setSelectedAddressId] = useState<string>('1')
+
+  useEffect(() => {
+    // 장바구니 아이템 구성
+    const items: CartItem[] = []
+    localCart.forEach((quantity, productId) => {
+      const product = SAMPLE_PRODUCTS.find((p) => p.id === productId)
+      if (product) {
+        items.push({
+          product,
+          quantity,
+          addedAt: new Date().toISOString(),
+        })
+      }
+    })
+    setCartItems(items)
+    // 초기 선택 상태: 모든 아이템 선택
+    setSelectedItems(new Set(items.map((item) => item.product.id)))
+  }, [localCart])
+
+  // 전체 선택/해제
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedItems(new Set())
+      setSelectAll(false)
+    } else {
+      setSelectedItems(new Set(cartItems.map((item) => item.product.id)))
+      setSelectAll(true)
+    }
+  }
+
+  // 개별 아이템 선택/해제
+  const handleItemSelect = (productId: string) => {
+    const newSelected = new Set(selectedItems)
+    if (newSelected.has(productId)) {
+      newSelected.delete(productId)
+    } else {
+      newSelected.add(productId)
+    }
+    setSelectedItems(newSelected)
+    setSelectAll(newSelected.size === cartItems.length)
+  }
+
+  // 선택된 아이템 삭제
+  const handleDeleteSelected = () => {
+    selectedItems.forEach((productId) => {
+      removeFromCart(productId)
+    })
+    setSelectedItems(new Set())
+    setSelectAll(false)
+  }
+
+  const handleCheckout = () => {
+    if (selectedItems.size === 0) {
+      alert('주문할 상품을 선택해주세요.')
+      return
+    }
+    navigate('/order-review')
+  }
+
+  // 선택된 아이템들의 총액 계산
+  const selectedItemsList = cartItems.filter((item) =>
+    selectedItems.has(item.product.id)
+  )
+
+  const selectedProductAmount = selectedItemsList.reduce(
+    (sum, item) => sum + item.product.price * item.quantity,
+    0
+  )
+
+  // 할인 금액 (예시: 10% 할인)
+  const discountAmount = Math.floor(selectedProductAmount * 0.1)
+  const orderAmount = selectedProductAmount - discountAmount
+  const shippingFee = selectedProductAmount >= 50000 ? 0 : 3000
+
+  const selectedAddress = addresses.find((addr) => addr.id === selectedAddressId) || addresses[0]
+
+  const handleSelectAddress = (addressId: string) => {
+    setSelectedAddressId(addressId)
+    setIsAddressModalOpen(false)
+  }
+
+  const handleAddAddress = (address: Omit<ShippingAddress, 'id' | 'createdAt'>) => {
+    const newAddress: ShippingAddress = {
+      ...address,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+    }
+    
+    // 기본 배송지로 설정하는 경우 기존 기본 배송지 해제
+    if (address.isDefault) {
+      setAddresses((prev) =>
+        prev.map((addr) => ({ ...addr, isDefault: false }))
+      )
+    }
+    
+    setAddresses((prev) => [...prev, newAddress])
+    
+    if (address.isDefault) {
+      setSelectedAddressId(newAddress.id)
+    }
+  }
+
+  const handleSetDefault = (addressId: string) => {
+    setAddresses((prev) =>
+      prev.map((addr) => ({
+        ...addr,
+        isDefault: addr.id === addressId,
+      }))
+    )
+    setSelectedAddressId(addressId)
+  }
+
+  return (
+    <div className="cart-page">
+      {/* 상단 헤더 */}
+      <Header showSearch={true} showQButton={false} />
+
+      {/* 빵부스러기 네비게이션 */}
+      <div className="breadcrumbs">
+        <span>장바구니</span>
+        <span className="breadcrumb-separator">{'>'}</span>
+        <span>주문/결제</span>
+        <span className="breadcrumb-separator">{'>'}</span>
+        <span>완료</span>
+      </div>
+
+      {isSyncing && (
+        <div className="sync-indicator">동기화 중...</div>
+      )}
+
+      {cartItems.length === 0 ? (
+        <div className="empty-cart">
+          <p>장바구니가 비어있습니다.</p>
+          <Button onClick={() => navigate('/')} variant="primary">
+            상품 보러가기
+          </Button>
+        </div>
+      ) : (
+        <div className="cart-content">
+          {/* 배송 정보 섹션 */}
+          <div className="delivery-section">
+            <div className="delivery-type">
+              <span>일반배송 {cartItems.length}</span>
+              <span className="delivery-separator">|</span>
+              <span>컬리N마트ㆍ지금배달 0</span>
+            </div>
+            <div className="delivery-address">
+              <span className="address-label">배송지 :</span>
+              <span className="address-text">
+                {selectedAddress.recipient} {selectedAddress.address} {selectedAddress.detailAddress}
+              </span>
+              <button
+                className="change-address-btn"
+                onClick={() => setIsAddressModalOpen(true)}
+              >
+                변경
+              </button>
+            </div>
+            <div className="delivery-info-banner">
+              등록한 배송지 기준 빠른배송 상품을 보실 수 있습니다.
+            </div>
+          </div>
+
+          {/* 전체 선택 및 삭제 */}
+          <div className="cart-controls">
+            <label className="select-all-checkbox">
+              <input
+                type="checkbox"
+                checked={selectAll}
+                onChange={handleSelectAll}
+              />
+              <span>전체 선택</span>
+            </label>
+            {selectedItems.size > 0 && (
+              <button className="delete-selected-btn" onClick={handleDeleteSelected}>
+                X 선택 삭제
+              </button>
+            )}
+          </div>
+
+          {/* 판매자별 상품 그룹 */}
+          <div className="seller-group">
+            <div className="seller-header">
+              <div className="seller-info">
+                <span className="seller-verified">✓</span>
+                <span className="seller-name">OPAY 공식인증점</span>
+                <span className="seller-badge">스마트스토어</span>
+              </div>
+              <button className="coupon-btn">쿠폰받기</button>
+            </div>
+
+            {/* 상품 목록 */}
+            <div className="products-in-cart">
+              {cartItems.map((item) => {
+                const isSelected = selectedItems.has(item.product.id)
+                const originalPrice = item.product.price * 1.5 // 예시 할인가
+                const discountRate = Math.floor(
+                  ((originalPrice - item.product.price) / originalPrice) * 100
+                )
+
+                return (
+                  <div key={item.product.id} className="cart-product-item">
+                    <div className="product-select">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleItemSelect(item.product.id)}
+                      />
+                    </div>
+
+                    <div className="product-main-info">
+                      {/* 태그 */}
+                      <div className="product-tags">
+                        <span className="tag gift">선물가능상품</span>
+                        <span className="tag return">무료교환반품</span>
+                      </div>
+
+                      {/* 배송 정보 */}
+                      <div className="delivery-info">
+                        <span className="delivery-time">
+                          오늘출발 16:00 이후 주문 시 1.26.(월) 발송 예정?
+                        </span>
+                        <span className="arrival-info">
+                          1. 27.(화) 도착확률 91%
+                        </span>
+                      </div>
+
+                      <div className="product-details-row">
+                        {/* 상품 이미지 */}
+                        <div className="product-image-cart">
+                          <div className="product-image-placeholder">
+                            {item.product.name.charAt(0)}
+                          </div>
+                        </div>
+
+                        {/* 상품 정보 */}
+                        <div className="product-info-cart">
+                          <h3 className="product-name-cart">{item.product.name}</h3>
+                          <div className="product-price-row">
+                            <span className="discount-rate">{discountRate}%</span>
+                            <span className="product-price-current">
+                              {item.product.price.toLocaleString()}원
+                            </span>
+                            <span className="product-price-original">
+                              {originalPrice.toLocaleString()}원
+                            </span>
+                          </div>
+                          <div className="seller-info-cart">
+                            OPAY 공식인증점 | 스마트스토어
+                          </div>
+                          <div className="product-option">
+                            <span>제품선택 : {item.product.name} / {item.quantity}개</span>
+                            <button
+                              className="modify-order-btn"
+                              onClick={() => navigate(`/products/${item.product.id}`)}
+                            >
+                              주문수정
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 개별 주문 정보 */}
+                      <div className="individual-order">
+                        <div className="order-amount">
+                          상품금액 {item.product.price.toLocaleString()}원
+                        </div>
+                        <button
+                          className="individual-order-btn"
+                          onClick={() => {
+                            const singleItem = new Set([item.product.id])
+                            setSelectedItems(singleItem)
+                            navigate('/order-review')
+                          }}
+                        >
+                          주문하기
+                        </button>
+                      </div>
+
+                      {/* 배송비 */}
+                      <div className="shipping-info">
+                        배송비 무료
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* 하단 주문 요약 (고정) */}
+          <div className="order-summary-sticky">
+            <div className="summary-content">
+              <div className="summary-row">
+                <span>선택상품금액</span>
+                <span>{selectedProductAmount.toLocaleString()}원</span>
+              </div>
+              <div className="summary-row">
+                <span>총 배송비</span>
+                <span>{shippingFee === 0 ? '무료' : `${shippingFee.toLocaleString()}원`}</span>
+              </div>
+              <div className="summary-row discount">
+                <span>할인예상금액</span>
+                <span className="discount-amount">-{discountAmount.toLocaleString()}원</span>
+              </div>
+              <div className="summary-row total">
+                <span>주문금액</span>
+                <span className="total-amount">
+                  {(orderAmount + shippingFee).toLocaleString()}원
+                </span>
+              </div>
+              <Button
+                fullWidth
+                onClick={handleCheckout}
+                variant="primary"
+                disabled={selectedItems.size === 0}
+                className="checkout-btn"
+              >
+                OPAY 공식인증점 {selectedItems.size}건 주문하기
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <CartButton />
+
+      {/* 배송지 선택 모달 */}
+      <AddressModal
+        isOpen={isAddressModalOpen}
+        onClose={() => setIsAddressModalOpen(false)}
+        addresses={addresses}
+        selectedAddressId={selectedAddressId}
+        onSelectAddress={handleSelectAddress}
+        onAddAddress={handleAddAddress}
+        onSetDefault={handleSetDefault}
+      />
+    </div>
+  )
+}
+
+export default CartPage

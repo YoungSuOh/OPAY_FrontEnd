@@ -1,0 +1,45 @@
+.btn {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-primary {
+  background: var(--sky-blue-600);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--sky-blue-700);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background: white;
+  color: var(--sky-blue-600);
+  border: 2px solid var(--sky-blue-600);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--sky-blue-50);
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #dc2626;
+}
+
+.btn-full-width {
+  width: 100%;
+}
