@@ -301,18 +301,28 @@ export const syncRecentProductsToServer = async (productIds: string[]): Promise<
 // 리뷰 관련 API
 export const getProductReviews = async (
   productId: string,
-  page: number = 1,
-  limit: number = 10
+  page: number = 0,
+  size: number = 10
 ): Promise<{ reviews: Review[]; hasMore: boolean }> => {
   const response = await fetch(
-    `${API_BASE_URL}/products/${productId}/reviews?page=${page}&limit=${limit}`
+    `${API_BASE_URL}/reviews/product/${productId}?page=${page}&size=${size}`
   )
 
   if (!response.ok) {
     throw new Error('리뷰 조회에 실패했습니다.')
   }
 
-  return response.json()
+  const data = await response.json()
+  // 백엔드 응답 형식에 맞게 변환
+  return {
+    reviews: data.reviews?.map((r: any) => ({
+      ...r,
+      id: String(r.id),
+      productId: String(r.productId),
+      userId: String(r.userId),
+    })) || [],
+    hasMore: data.hasNext || false,
+  }
 }
 
 export const createReview = async (
@@ -372,6 +382,91 @@ export const deleteReview = async (reviewId: string): Promise<void> => {
   if (!response.ok) {
     throw new Error('리뷰 삭제에 실패했습니다.')
   }
+}
+
+// 상품 관련 API
+export interface ProductListParams {
+  keyword?: string
+  category?: string
+  minPrice?: number
+  maxPrice?: number
+  sortBy?: 'created' | 'price' | 'name' | 'rating' | 'reviews'
+  sortDirection?: 'asc' | 'desc'
+  page?: number
+  size?: number
+}
+
+export interface ProductListResponse {
+  products: Product[]
+  totalElements: number
+  totalPages: number
+  currentPage: number
+  pageSize: number
+  hasNext: boolean
+  hasPrevious: boolean
+}
+
+// 상품 목록 조회
+export const getProducts = async (params: ProductListParams = {}): Promise<ProductListResponse> => {
+  const queryParams = new URLSearchParams()
+  
+  if (params.keyword) queryParams.append('keyword', params.keyword)
+  if (params.category) queryParams.append('category', params.category)
+  if (params.minPrice !== undefined) queryParams.append('minPrice', params.minPrice.toString())
+  if (params.maxPrice !== undefined) queryParams.append('maxPrice', params.maxPrice.toString())
+  if (params.sortBy) queryParams.append('sortBy', params.sortBy)
+  if (params.sortDirection) queryParams.append('sortDirection', params.sortDirection)
+  queryParams.append('page', (params.page || 0).toString())
+  queryParams.append('size', (params.size || 20).toString())
+
+  const response = await fetch(`${API_BASE_URL}/products?${queryParams.toString()}`, {
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    throw new Error('상품 목록 조회에 실패했습니다.')
+  }
+
+  const data = await response.json()
+  // 백엔드의 id를 string으로 변환
+  return {
+    ...data,
+    products: data.products.map((p: any) => ({
+      ...p,
+      id: String(p.id),
+    })),
+  }
+}
+
+// 상품 상세 조회
+export const getProduct = async (id: string): Promise<Product> => {
+  const response = await fetch(`${API_BASE_URL}/products/${id}`, {
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    throw new Error('상품 조회에 실패했습니다.')
+  }
+
+  const data = await response.json()
+  // 백엔드의 id를 string으로 변환
+  return {
+    ...data,
+    id: String(data.id),
+  }
+}
+
+// 카테고리 목록 조회
+export const getCategories = async (): Promise<string[]> => {
+  const response = await fetch(`${API_BASE_URL}/products/categories`, {
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    throw new Error('카테고리 목록 조회에 실패했습니다.')
+  }
+
+  return response.json()
 }
 
 // 구매 내역 관련 API

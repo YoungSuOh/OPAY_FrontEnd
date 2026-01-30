@@ -3,43 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useCartStore } from '../store/cartStore'
 import { useRecentProductsStore } from '../store/recentProductsStore'
 import { Product, Review } from '../types'
-import { getProductReviews, createReview } from '../utils/api'
-import PageContainer from '../components/PageContainer'
+import { getProduct, getProductReviews, createReview } from '../utils/api'
 import Button from '../components/Button'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Header from '../components/Header'
+import CartButton from '../components/CartButton'
 import './ProductDetailPage.css'
-
-// 샘플 상품 데이터
-const SAMPLE_PRODUCTS: Product[] = [
-  {
-    id: '1',
-    name: '프리미엄 플랜',
-    description: '모든 기능을 사용할 수 있는 프리미엄 플랜입니다.',
-    price: 9900,
-    stock: 100,
-    averageRating: 4.5,
-    reviewCount: 128,
-  },
-  {
-    id: '2',
-    name: '베이직 플랜',
-    description: '기본 기능을 사용할 수 있는 베이직 플랜입니다.',
-    price: 4900,
-    stock: 50,
-    averageRating: 4.2,
-    reviewCount: 89,
-  },
-  {
-    id: '3',
-    name: '스타터 플랜',
-    description: '시작하기 좋은 스타터 플랜입니다.',
-    price: 2900,
-    stock: 30,
-    averageRating: 4.0,
-    reviewCount: 45,
-  },
-]
 
 const ProductDetailPage = () => {
   const { id } = useParams<{ id: string }>()
@@ -56,12 +25,22 @@ const ProductDetailPage = () => {
 
   useEffect(() => {
     // 상품 정보 로드
-    const foundProduct = SAMPLE_PRODUCTS.find((p) => p.id === id)
-    if (foundProduct) {
-      setProduct(foundProduct)
-      addRecentProduct(foundProduct.id)
+    const loadProduct = async () => {
+      if (!id) return
+      
+      setIsLoading(true)
+      try {
+        const productData = await getProduct(id)
+        setProduct(productData)
+        addRecentProduct(productData.id)
+      } catch (error) {
+        console.error('상품 로드 실패:', error)
+      } finally {
+        setIsLoading(false)
+      }
     }
-    setIsLoading(false)
+
+    loadProduct()
   }, [id, addRecentProduct])
 
   useEffect(() => {
@@ -80,20 +59,7 @@ const ProductDetailPage = () => {
         setHasMore(data.hasMore)
       } catch (error) {
         console.error('리뷰 로드 실패:', error)
-        // 샘플 리뷰 데이터
-        if (page === 1) {
-          setReviews([
-            {
-              id: '1',
-              productId: id,
-              userId: 'user1',
-              userName: '홍길동',
-              rating: 5,
-              content: '정말 좋은 상품입니다!',
-              createdAt: new Date().toISOString(),
-            },
-          ])
-        }
+        setReviews([])
         setHasMore(false)
       } finally {
         setIsLoadingReviews(false)
@@ -124,43 +90,59 @@ const ProductDetailPage = () => {
 
   if (isLoading || !product) {
     return (
-      <PageContainer>
-        <LoadingSpinner />
-      </PageContainer>
+      <div className="product-detail-page">
+        <Header showSearch={true} showQButton={false} />
+        <div className="product-detail-content">
+          <LoadingSpinner />
+        </div>
+      </div>
     )
   }
 
   return (
-    <PageContainer>
+    <div className="product-detail-page">
       <Header showSearch={true} showQButton={false} />
-      <div className="product-detail">
-        <div className="product-header">
-          <h1 className="product-title">{product.name}</h1>
-          <div className="product-rating">
-            ⭐ {product.averageRating} ({product.reviewCount}개 리뷰)
+      <div className="product-detail-content">
+        <div className="product-info-section">
+          <div className="product-image-container">
+            {product.imageUrl ? (
+              <img src={product.imageUrl} alt={product.name} />
+            ) : (
+              <div className="product-image-placeholder">
+                {product.name.charAt(0)}
+              </div>
+            )}
           </div>
-          <div className="product-price-large">
-            {product.price.toLocaleString()}원
+          <div className="product-info">
+            <h1 className="product-title">{product.name}</h1>
+            <div className="product-rating">
+              {'★'.repeat(Math.floor(product.averageRating || 0))} 
+              <span className="rating-text">
+                {product.averageRating?.toFixed(1) || 0} ({product.reviewCount || 0}개 리뷰)
+              </span>
+            </div>
+            <div className="product-price-large">
+              {product.price.toLocaleString()}원
+            </div>
+            <div className="product-stock">
+              재고: {product.stock}개
+            </div>
+            <p className="product-description">{product.description}</p>
+            <div className="product-actions-section">
+              <Button
+                fullWidth
+                onClick={handleAddToCart}
+                variant="primary"
+                disabled={product.stock === 0}
+              >
+                {product.stock === 0 ? '품절' : '장바구니 담기'}
+              </Button>
+            </div>
           </div>
-          <p className="product-description">{product.description}</p>
-          <div className="product-stock">
-            재고: {product.stock}개
-          </div>
-        </div>
-
-        <div className="product-actions-section">
-          <Button
-            fullWidth
-            onClick={handleAddToCart}
-            variant="primary"
-            disabled={product.stock === 0}
-          >
-            {product.stock === 0 ? '품절' : '장바구니 담기'}
-          </Button>
         </div>
 
         <div className="reviews-section">
-          <h2 className="section-title">리뷰 ({product.reviewCount})</h2>
+          <h2 className="section-title">리뷰 ({product.reviewCount || 0})</h2>
           
           <div className="reviews-list">
             {reviews.map((review, index) => (
@@ -209,7 +191,8 @@ const ProductDetailPage = () => {
           </div>
         </div>
       </div>
-    </PageContainer>
+      <CartButton />
+    </div>
   )
 }
 
