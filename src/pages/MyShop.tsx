@@ -1,8 +1,10 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Product, ShippingAddress } from '../types'
-import { getOrderList, getRecentProducts } from '../utils/api'
+import { getOrderList } from '../utils/api'
 import { useAuthStore } from '../store/authStore'
+import { useRecentProductsStore } from '../store/recentProductsStore'
+import { getProduct } from '../utils/api'
 import Button from '../components/Button'
 import CartButton from '../components/CartButton'
 import AddressModal from '../components/AddressModal'
@@ -23,8 +25,9 @@ interface RecentPayment {
 const MyShop = () => {
   const navigate = useNavigate()
   const { isLoggedIn } = useAuthStore()
+  const { recentProducts } = useRecentProductsStore()
   const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([])
-  const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([])
+  const [recentViewedProducts, setRecentViewedProducts] = useState<Product[]>([])
   const [userPoint] = useState(412)
   const [userMoney] = useState(3114)
   const [monthlyOrderCount, setMonthlyOrderCount] = useState(0)
@@ -116,13 +119,14 @@ const MyShop = () => {
         setRecentPayments(payments)
       } catch (error) {
         // 샘플 데이터
+        const now = new Date()
         setRecentPayments([
           {
             orderId: 'ORDER-001',
             productName: '프리미엄 플랜',
             amount: 9900,
             status: 'CONFIRMED',
-            paidAt: new Date().toISOString(),
+            paidAt: now.toISOString(),
             pointEarned: 247,
           },
           {
@@ -130,21 +134,50 @@ const MyShop = () => {
             productName: '베이직 플랜',
             amount: 4900,
             status: 'COMPLETED',
-            paidAt: new Date(Date.now() - 3600000).toISOString(),
+            paidAt: new Date(now.getTime() - 3600000).toISOString(),
             pointEarned: 122,
+          },
+          {
+            orderId: 'ORDER-003',
+            productName: '스타터 플랜',
+            amount: 2900,
+            status: 'CONFIRMED',
+            paidAt: new Date(now.getTime() - 7200000).toISOString(),
+            pointEarned: 72,
+          },
+          {
+            orderId: 'ORDER-004',
+            productName: '프리미엄 플랜',
+            amount: 9900,
+            status: 'COMPLETED',
+            paidAt: new Date(now.getTime() - 10800000).toISOString(),
+            pointEarned: 247,
+          },
+          {
+            orderId: 'ORDER-005',
+            productName: '베이직 플랜',
+            amount: 4900,
+            status: 'CONFIRMED',
+            paidAt: new Date(now.getTime() - 14400000).toISOString(),
+            pointEarned: 122,
+          },
+          {
+            orderId: 'ORDER-006',
+            productName: '스타터 플랜',
+            amount: 2900,
+            status: 'COMPLETED',
+            paidAt: new Date(now.getTime() - 18000000).toISOString(),
+            pointEarned: 72,
           },
         ])
       }
     }
 
-    // 추천 상품 로드
-    const loadRecommendedProducts = async () => {
-      try {
-        const products = await getRecentProducts()
-        setRecommendedProducts(products)
-      } catch (error) {
-        // 샘플 데이터
-        setRecommendedProducts([
+    // 최근 조회한 상품 로드
+    const loadRecentViewedProducts = async () => {
+      if (recentProducts.length === 0) {
+        // 더미 데이터 (확인용)
+        setRecentViewedProducts([
           {
             id: '1',
             name: '프리미엄 플랜',
@@ -153,6 +186,7 @@ const MyShop = () => {
             stock: 100,
             averageRating: 5.0,
             reviewCount: 7,
+            imageUrl: 'https://picsum.photos/200/200?random=1',
           },
           {
             id: '2',
@@ -162,6 +196,7 @@ const MyShop = () => {
             stock: 50,
             averageRating: 4.8,
             reviewCount: 4475,
+            imageUrl: 'https://picsum.photos/200/200?random=2',
           },
           {
             id: '3',
@@ -171,8 +206,77 @@ const MyShop = () => {
             stock: 30,
             averageRating: 4.8,
             reviewCount: 630,
+            imageUrl: 'https://picsum.photos/200/200?random=3',
+          },
+          {
+            id: '4',
+            name: '프리미엄 플랜',
+            description: '모든 기능을 사용할 수 있는 프리미엄 플랜입니다.',
+            price: 9900,
+            stock: 100,
+            averageRating: 5.0,
+            reviewCount: 7,
+            imageUrl: 'https://picsum.photos/200/200?random=4',
+          },
+          {
+            id: '5',
+            name: '베이직 플랜',
+            description: '기본 기능을 사용할 수 있는 베이직 플랜입니다.',
+            price: 4900,
+            stock: 50,
+            averageRating: 4.8,
+            reviewCount: 4475,
+            imageUrl: 'https://picsum.photos/200/200?random=5',
+          },
+          {
+            id: '6',
+            name: '스타터 플랜',
+            description: '시작하기 좋은 스타터 플랜입니다.',
+            price: 2900,
+            stock: 30,
+            averageRating: 4.8,
+            reviewCount: 630,
+            imageUrl: 'https://picsum.photos/200/200?random=6',
+          },
+          {
+            id: '7',
+            name: '프리미엄 플랜',
+            description: '모든 기능을 사용할 수 있는 프리미엄 플랜입니다.',
+            price: 9900,
+            stock: 100,
+            averageRating: 5.0,
+            reviewCount: 7,
+            imageUrl: 'https://picsum.photos/200/200?random=7',
+          },
+          {
+            id: '8',
+            name: '베이직 플랜',
+            description: '기본 기능을 사용할 수 있는 베이직 플랜입니다.',
+            price: 4900,
+            stock: 50,
+            averageRating: 4.8,
+            reviewCount: 4475,
+            imageUrl: 'https://picsum.photos/200/200?random=8',
           },
         ])
+        return
+      }
+      try {
+        const productDetails = await Promise.all(
+          recentProducts.slice(0, 10).map(async (rp) => {
+            try {
+              const product = await getProduct(rp.productId)
+              return product
+            } catch (error) {
+              console.error(`상품 ID ${rp.productId} 로드 실패:`, error)
+              return null
+            }
+          })
+        )
+        setRecentViewedProducts(productDetails.filter(p => p !== null) as Product[])
+      } catch (error) {
+        console.error('최근 조회한 상품 로드 실패:', error)
+        setRecentViewedProducts([])
       }
     }
 
@@ -202,9 +306,9 @@ const MyShop = () => {
     }
 
     loadRecentPayments()
-    loadRecommendedProducts()
+    loadRecentViewedProducts()
     loadOrderStats()
-  }, [])
+  }, [recentProducts])
 
   const getStatusLabel = (status: RecentPayment['status']) => {
     switch (status) {
@@ -231,13 +335,7 @@ const MyShop = () => {
 
       <div className="my-shop-content">
         {/* 메인 콘텐츠 영역 */}
-        <div className="main-content">
-          {/* 서브 네비게이션 */}
-          <div className="sub-nav">
-            <button className="sub-nav-item active">전체</button>
-            <button className="sub-nav-item">쇼핑</button>
-            <button className="sub-nav-item">현장결제</button>
-          </div>
+        <div className="main-content">         
 
           {/* 최근 결제 내역 */}
           <div className="recent-payments-section">
@@ -275,31 +373,43 @@ const MyShop = () => {
             </div>
           </div>
 
-          {/* 추천 상품 */}
-          <div className="recommended-section">
-            <h2 className="section-title">관심 있을만한 상품</h2>
+          {/* 최근 본 상품 */}
+          <div className="recent-viewed-section">
+            <h2 className="section-title">최근 본 상품</h2>
             <div className="products-scroll">
-              {recommendedProducts.map((product) => (
-                <div
-                  key={product.id}
-                  className="product-card-small"
-                  onClick={() => navigate(`/products/${product.id}`)}
-                >
-                  <div className="product-badge">구매 {(product.reviewCount || 0)}+</div>
-                  <div className="product-image-placeholder">
-                    {product.name.charAt(0)}
-                  </div>
-                  <div className="product-info-small">
-                    <div className="product-name-small">{product.name}</div>
-                    <div className="product-price-small">
-                      {product.price.toLocaleString()}원
+              {recentViewedProducts.length === 0 ? (
+                <div style={{ padding: '20px', textAlign: 'center' }}>최근 조회한 상품이 없습니다.</div>
+              ) : (
+                recentViewedProducts.map((product) => (
+                  <div
+                    key={product.id}
+                    className="product-card-small"
+                    onClick={() => navigate(`/products/${product.id}`)}
+                  >
+                    <div className="product-image-placeholder">
+                      {product.imageUrl ? (
+                        <img src={product.imageUrl} alt={product.name} />
+                      ) : (
+                        product.name.charAt(0)
+                      )}
                     </div>
-                    <div className="product-rating-small">
-                      ★{product.averageRating} ({(product.reviewCount || 0)})
+                    <div className="product-info-small">
+                      <div 
+                        className="product-name-small" 
+                        title={product.name}
+                      >
+                        {product.name}
+                      </div>
+                      <div className="product-price-small">
+                        {product.price.toLocaleString()}원
+                      </div>
+                      <div className="product-rating-small">
+                        ★{product.averageRating?.toFixed(1) || 0} ({(product.reviewCount || 0)})
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>
