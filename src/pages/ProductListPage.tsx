@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCartStore } from '../store/cartStore'
+import { useAuthStore } from '../store/authStore'
 import { useRecentProductsStore } from '../store/recentProductsStore'
 import { Product } from '../types'
 import { getProducts, getCategories } from '../utils/api'
@@ -8,6 +9,8 @@ import Button from '../components/Button'
 import CartButton from '../components/CartButton'
 import Header from '../components/Header'
 import LoadingSpinner from '../components/LoadingSpinner'
+import Toast from '../components/Toast'
+import AuthModal from '../components/AuthModal'
 import './ProductListPage.css'
 
 const RELATED_KEYWORDS = [
@@ -23,7 +26,8 @@ const RELATED_KEYWORDS = [
 
 const ProductListPage = () => {
   const navigate = useNavigate()
-  const { addToCart, localCart } = useCartStore()
+  const { isLoggedIn } = useAuthStore()
+  const { addToCart, getCartItems } = useCartStore()
   const { addRecentProduct } = useRecentProductsStore()
   
   const [searchQuery, setSearchQuery] = useState('')
@@ -36,6 +40,8 @@ const ProductListPage = () => {
   const [showFilters, setShowFilters] = useState(true)
   const [page, setPage] = useState(0)
   const [totalElements, setTotalElements] = useState(0)
+  const [showToast, setShowToast] = useState(false)
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
 
   useEffect(() => {
     // 카테고리 목록 로드
@@ -94,8 +100,26 @@ const ProductListPage = () => {
     loadProducts()
   }, [searchQuery, selectedCategory, priceRange, sortBy, page, addRecentProduct])
 
-  const handleAddToCart = (product: Product) => {
-    addToCart(product, 1)
+  const handleAddToCart = async (product: Product) => {
+    try {
+      if (!isLoggedIn) {
+        setIsAuthModalOpen(true)
+        return
+      }
+      await addToCart(product, 1)
+      setShowToast(true)
+    } catch (error) {
+      console.error('장바구니 추가 실패:', error)
+      if (error instanceof Error) {
+        if (error.message.includes('로그인')) {
+          setIsAuthModalOpen(true)
+        } else {
+          alert(error.message)
+        }
+      } else {
+        alert('장바구니 추가에 실패했습니다.')
+      }
+    }
   }
 
   const handlePriceRangeSelect = (range: string) => {
@@ -329,7 +353,9 @@ const ProductListPage = () => {
               </div>
             )}
             {filteredProducts.map((product) => {
-              const cartQuantity = localCart.get(product.id) || 0
+              const cartItems = getCartItems()
+              const cartItem = cartItems.find(item => item.product.id === product.id)
+              const cartQuantity = cartItem?.quantity || 0
               return (
                 <div 
                   key={product.id} 
@@ -436,6 +462,19 @@ const ProductListPage = () => {
       </div>
 
       <CartButton />
+      
+      {/* 토스트 알림 */}
+      <Toast
+        message="장바구니에 추가되었습니다"
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+      />
+
+      {/* 로그인 모달 */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+      />
     </div>
   )
 }

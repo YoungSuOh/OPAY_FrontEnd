@@ -1,53 +1,40 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCartStore } from '../store/cartStore'
-import { Product, CartItem, ShippingAddress } from '../types'
+import { useAuthStore } from '../store/authStore'
+import { CartItem, ShippingAddress } from '../types'
 import Button from '../components/Button'
 import CartButton from '../components/CartButton'
 import AddressModal from '../components/AddressModal'
+import AuthModal from '../components/AuthModal'
+import ConfirmModal from '../components/ConfirmModal'
 import Header from '../components/Header'
 import './CartPage.css'
 
-// 샘플 상품 데이터 (실제로는 API에서 가져옴)
-const SAMPLE_PRODUCTS: Product[] = [
-  {
-    id: '1',
-    name: '프리미엄 플랜',
-    description: '모든 기능을 사용할 수 있는 프리미엄 플랜입니다.',
-    price: 9900,
-    stock: 100,
-    averageRating: 5.0,
-    reviewCount: 7,
-    category: '플랜',
-  },
-  {
-    id: '2',
-    name: '베이직 플랜',
-    description: '기본 기능을 사용할 수 있는 베이직 플랜입니다.',
-    price: 4900,
-    stock: 50,
-    averageRating: 4.8,
-    reviewCount: 4475,
-    category: '플랜',
-  },
-  {
-    id: '3',
-    name: '스타터 플랜',
-    description: '시작하기 좋은 스타터 플랜입니다.',
-    price: 2900,
-    stock: 30,
-    averageRating: 4.8,
-    reviewCount: 630,
-    category: '플랜',
-  },
-]
-
 const CartPage = () => {
   const navigate = useNavigate()
-  const { localCart, updateQuantity, removeFromCart, isSyncing } = useCartStore()
+  const { isLoggedIn } = useAuthStore()
+  const { 
+    getCartItems, 
+    loadCartItems, 
+    updateQuantity, 
+    removeFromCart,
+    removeFromCartByProductId,
+    isSyncing,
+    isLoading 
+  } = useCartStore()
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
   const [selectAll, setSelectAll] = useState(true)
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
+
+  // 비로그인 상태 접근 차단
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setIsAuthModalOpen(true)
+    }
+  }, [isLoggedIn])
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false)
   const [addresses, setAddresses] = useState<ShippingAddress[]>([
     {
@@ -76,22 +63,23 @@ const CartPage = () => {
   const [selectedAddressId, setSelectedAddressId] = useState<string>('1')
 
   useEffect(() => {
-    // 장바구니 아이템 구성
-    const items: CartItem[] = []
-    localCart.forEach((quantity, productId) => {
-      const product = SAMPLE_PRODUCTS.find((p) => p.id === productId)
-      if (product) {
-        items.push({
-          product,
-          quantity,
-          addedAt: new Date().toISOString(),
-        })
+    // 서버에서 장바구니 로드
+    const loadCart = async () => {
+      if (isLoggedIn) {
+        await loadCartItems()
       }
-    })
-    setCartItems(items)
-    // 초기 선택 상태: 모든 아이템 선택
-    setSelectedItems(new Set(items.map((item) => item.product.id)))
-  }, [localCart])
+      const items = getCartItems() || []
+      setCartItems(items)
+      // 초기 선택 상태: 모든 아이템 선택
+      if (items.length > 0) {
+        setSelectedItems(new Set(items.map((item) => item.product.id)))
+      } else {
+        setSelectedItems(new Set())
+        setSelectAll(false)
+      }
+    }
+    loadCart()
+  }, [isLoggedIn, loadCartItems, getCartItems])
 
   // 전체 선택/해제
   const handleSelectAll = () => {
@@ -99,7 +87,8 @@ const CartPage = () => {
       setSelectedItems(new Set())
       setSelectAll(false)
     } else {
-      setSelectedItems(new Set(cartItems.map((item) => item.product.id)))
+      const items = cartItems || []
+      setSelectedItems(new Set(items.map((item) => item.product.id)))
       setSelectAll(true)
     }
   }
@@ -116,11 +105,33 @@ const CartPage = () => {
     setSelectAll(newSelected.size === cartItems.length)
   }
 
-  // 선택된 아이템 삭제
-  const handleDeleteSelected = () => {
-    selectedItems.forEach((productId) => {
-      removeFromCart(productId)
-    })
+  // 선택된 아이템 삭제 확인 모달 열기
+  const handleDeleteSelectedClick = () => {
+    if (selectedItems.size === 0) {
+      return
+    }
+    setIsConfirmModalOpen(true)
+  }
+
+  // 선택된 아이템 삭제 실행
+  const handleDeleteSelected = async () => {
+    setIsConfirmModalOpen(false)
+    const itemsToDelete = cartItems.filter((item) => selectedItems.has(item.product.id))
+    for (const item of itemsToDelete) {
+      if (item.cartId) {
+        // 서버 장바구니 항목 삭제
+        await removeFromCart(item.cartId)
+      } else {
+        // 로컬 장바구니 항목 삭제 (비로그인 상태)
+        removeFromCartByProductId(item.product.id)
+      }
+    }
+    // 장바구니 다시 로드
+    if (isLoggedIn) {
+      await loadCartItems()
+    }
+    const items = getCartItems()
+    setCartItems(items)
     setSelectedItems(new Set())
     setSelectAll(false)
   }
@@ -134,7 +145,7 @@ const CartPage = () => {
   }
 
   // 선택된 아이템들의 총액 계산
-  const selectedItemsList = cartItems.filter((item) =>
+  const selectedItemsList = (cartItems || []).filter((item) =>
     selectedItems.has(item.product.id)
   )
 
@@ -204,7 +215,7 @@ const CartPage = () => {
         <div className="sync-indicator">동기화 중...</div>
       )}
 
-      {cartItems.length === 0 ? (
+      {(cartItems || []).length === 0 ? (
         <div className="empty-cart">
           <p>장바구니가 비어있습니다.</p>
           <Button onClick={() => navigate('/')} variant="primary">
@@ -248,7 +259,7 @@ const CartPage = () => {
               <span>전체 선택</span>
             </label>
             {selectedItems.size > 0 && (
-              <button className="delete-selected-btn" onClick={handleDeleteSelected}>
+              <button className="delete-selected-btn" onClick={handleDeleteSelectedClick}>
                 X 선택 삭제
               </button>
             )}
@@ -267,7 +278,7 @@ const CartPage = () => {
 
             {/* 상품 목록 */}
             <div className="products-in-cart">
-              {cartItems.map((item) => {
+              {(cartItems || []).map((item) => {
                 const isSelected = selectedItems.has(item.product.id)
                 const originalPrice = item.product.price * 1.5 // 예시 할인가
                 const discountRate = Math.floor(
@@ -304,9 +315,13 @@ const CartPage = () => {
                       <div className="product-details-row">
                         {/* 상품 이미지 */}
                         <div className="product-image-cart">
-                          <div className="product-image-placeholder">
-                            {item.product.name.charAt(0)}
-                          </div>
+                          {item.product.imageUrl ? (
+                            <img src={item.product.imageUrl} alt={item.product.name} />
+                          ) : (
+                            <div className="product-image-placeholder">
+                              {item.product.name.charAt(0)}
+                            </div>
+                          )}
                         </div>
 
                         {/* 상품 정보 */}
@@ -410,6 +425,27 @@ const CartPage = () => {
         onSelectAddress={handleSelectAddress}
         onAddAddress={handleAddAddress}
         onSetDefault={handleSetDefault}
+      />
+
+      {/* 로그인 모달 */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => {
+          setIsAuthModalOpen(false)
+          if (!isLoggedIn) {
+            navigate('/')
+          }
+        }}
+      />
+
+      {/* 삭제 확인 모달 */}
+      <ConfirmModal
+        isOpen={isConfirmModalOpen}
+        message="장바구니에서 삭제하겠습니까?"
+        confirmText="삭제"
+        cancelText="취소"
+        onConfirm={handleDeleteSelected}
+        onCancel={() => setIsConfirmModalOpen(false)}
       />
     </div>
   )

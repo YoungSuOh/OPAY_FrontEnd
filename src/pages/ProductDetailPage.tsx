@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useCartStore } from '../store/cartStore'
+import { useAuthStore } from '../store/authStore'
 import { useRecentProductsStore } from '../store/recentProductsStore'
 import { Product, Review } from '../types'
 import { getProduct, getProductReviews, createReview } from '../utils/api'
@@ -8,13 +9,18 @@ import Button from '../components/Button'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Header from '../components/Header'
 import CartButton from '../components/CartButton'
+import AuthModal from '../components/AuthModal'
+import Toast from '../components/Toast'
 import './ProductDetailPage.css'
 
 const ProductDetailPage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { isLoggedIn } = useAuthStore()
   const { addToCart } = useCartStore()
   const { addRecentProduct } = useRecentProductsStore()
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+  const [showToast, setShowToast] = useState(false)
   
   const [product, setProduct] = useState<Product | null>(null)
   const [reviews, setReviews] = useState<Review[]>([])
@@ -69,10 +75,28 @@ const ProductDetailPage = () => {
     loadReviews()
   }, [id, page])
 
-  const handleAddToCart = () => {
-    if (product) {
-      addToCart(product, 1)
-      alert('장바구니에 추가되었습니다.')
+  const handleAddToCart = async () => {
+    if (!product) return
+    
+    if (!isLoggedIn) {
+      setIsAuthModalOpen(true)
+      return
+    }
+
+    try {
+      await addToCart(product, 1)
+      setShowToast(true)
+    } catch (error) {
+      console.error('장바구니 추가 실패:', error)
+      if (error instanceof Error) {
+        if (error.message.includes('로그인')) {
+          setIsAuthModalOpen(true)
+        } else {
+          alert(error.message)
+        }
+      } else {
+        alert('장바구니 추가에 실패했습니다.')
+      }
     }
   }
 
@@ -192,6 +216,15 @@ const ProductDetailPage = () => {
         </div>
       </div>
       <CartButton />
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)} 
+      />
+      <Toast
+        message="장바구니에 추가되었습니다"
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+      />
     </div>
   )
 }

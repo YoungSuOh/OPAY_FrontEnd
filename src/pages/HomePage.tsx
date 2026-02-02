@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCartStore } from '../store/cartStore'
+import { useAuthStore } from '../store/authStore'
 import { Product } from '../types'
 import { getProducts } from '../utils/api'
 import Header from '../components/Header'
 import CartButton from '../components/CartButton'
 import LoadingSpinner from '../components/LoadingSpinner'
+import Toast from '../components/Toast'
+import AuthModal from '../components/AuthModal'
 import './HomePage.css'
 
 // 카테고리 목록
@@ -30,6 +33,7 @@ const CATEGORIES = [
 const HomePage = () => {
   const navigate = useNavigate()
   const { addToCart } = useCartStore()
+  const { isLoggedIn } = useAuthStore()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [specialPage, setSpecialPage] = useState(1)
@@ -40,6 +44,8 @@ const HomePage = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [isRecommendedTransitioning, setIsRecommendedTransitioning] = useState(false)
+  const [showToast, setShowToast] = useState(false)
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
 
   const ITEMS_PER_PAGE = 3 // 페이지당 표시할 상품 수
   const totalSpecialPages = Math.ceil(specialProducts.length / ITEMS_PER_PAGE)
@@ -114,8 +120,22 @@ const HomePage = () => {
     loadCategoryProducts()
   }, [])
 
-  const handleAddToCart = (product: Product) => {
-    addToCart(product, 1)
+  const handleAddToCart = async (product: Product) => {
+    try {
+      if (!isLoggedIn) {
+        setIsAuthModalOpen(true)
+        return
+      }
+      await addToCart(product, 1)
+      setShowToast(true)
+    } catch (error) {
+      console.error('장바구니 추가 실패:', error)
+      if (error instanceof Error) {
+        alert(error.message)
+      } else {
+        alert('장바구니 추가에 실패했습니다.')
+      }
+    }
   }
 
   const handleSpecialNext = () => {
@@ -395,6 +415,19 @@ const HomePage = () => {
       </div>
 
       <CartButton />
+
+      {/* 토스트 알림 */}
+      <Toast
+        message="장바구니에 추가되었습니다"
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+      />
+
+      {/* 로그인 모달 */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+      />
     </div>
   )
 }
