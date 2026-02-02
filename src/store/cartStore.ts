@@ -1,148 +1,201 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
 import { CartItem, Product } from '../types'
+import { 
+  addToCart as apiAddToCart, 
+  getCartItems as apiGetCartItems, 
+  updateCartQuantity, 
+  removeFromCart as apiRemoveFromCart, 
+  clearCart as apiClearCart,
+  getCartItemCount,
+  CartResponse,
+  CartListResponse
+} from '../utils/api'
+import { useAuthStore } from './authStore'
 
 interface CartState {
-  // LocalStorage 기반 임시 장바구니
-  localCart: Map<string, number> // productId -> quantity
+  serverCartItems: CartItem[]
+  cartItemCount: number
+  isLoading: boolean
   isSyncing: boolean
   
-  // Actions
-  addToCart: (product: Product, quantity: number) => void
-  updateQuantity: (productId: string, quantity: number) => void
-  removeFromCart: (productId: string) => void
-  clearCart: () => void
+  addToCart: (product: Product, quantity: number) => Promise<void>
+  updateQuantity: (cartId: number, productId: string, quantity: number) => Promise<void>
+  removeFromCart: (cartId: number) => Promise<void>
+  removeFromCartByProductId: (productId: string) => void
+  clearCart: () => Promise<void>
+  loadCartItems: () => Promise<void>
+  loadCartItemCount: () => Promise<void>
   getCartItems: () => CartItem[]
   getCartTotal: () => number
-  mergeWithServerCart: (serverCart: CartItem[]) => void
-  syncToServer: () => Promise<void>
 }
 
-const CART_STORAGE_KEY = 'opay_local_cart'
+const convertCartResponseToCartItem = (response: CartResponse): CartItem => {
+  const item: CartItem = {
+    product: {
+      id: String(response.productId),
+      name: response.productName,
+      description: '',
+      price: response.productPrice,
+      stock: response.stock,
+      imageUrl: response.productImageUrl,
+    },
+    quantity: response.quantity,
+    addedAt: response.addedAt,
+  }
+  if (response.id) {
+    Object.assign(item, { cartId: response.id })
+  }
+  return item
+}
 
 export const useCartStore = create<CartState>()(
-  persist(
-    (set, get) => ({
-      localCart: new Map(),
-      isSyncing: false,
+  (set, get) => ({
+    serverCartItems: [],
+    cartItemCount: 0,
+    isLoading: false,
+    isSyncing: false,
 
-      addToCart: (product, quantity) => {
-        set((state) => {
-          const newMap = new Map(state.localCart)
-          const current = newMap.get(product.id) || 0
-          newMap.set(product.id, current + quantity)
-          return { localCart: newMap }
-        })
-        // Optimistic UI: 즉시 반영
-        get().syncToServer().catch(console.error)
-      },
+    addToCart: async (product, quantity) => {
+      const { isLoggedIn } = useAuthStore.getState()
+      
+      if (!isLoggedIn) {
+        throw new Error('로그인이 필요한 서비스입니다. 로그인 후 이용해주세요.')
+      }
 
-      updateQuantity: (productId, quantity) => {
-        set((state) => {
-          const newMap = new Map(state.localCart)
-          if (quantity <= 0) {
-            newMap.delete(productId)
-          } else {
-            newMap.set(productId, quantity)
-          }
-          return { localCart: newMap }
-        })
-        // Optimistic UI: 즉시 반영
-        get().syncToServer().catch(console.error)
-      },
+      set({ isSyncing: true })
+      try {
+        console.log('장바구니에 상품 추가 시작:', { productId: product.id, quantity })
+        const result = await apiAddToCart(product.id, quantity)
+        console.log('장바구니 추가 완료, 목록 다시 로드:', result)
+        await get().loadCartItems()
+        await get().loadCartItemCount()
+      } catch (error) {
+        console.error('장바구니 추가 실패:', error)
+        throw error
+      } finally {
+        set({ isSyncing: false })
+      }
+    },
 
-      removeFromCart: (productId) => {
-        set((state) => {
-          const newMap = new Map(state.localCart)
-          newMap.delete(productId)
-          return { localCart: newMap }
-        })
-        // Optimistic UI: 즉시 반영
-        get().syncToServer().catch(console.error)
-      },
+    updateQuantity: async (cartId, _productId, quantity) => {
+      const { isLoggedIn } = useAuthStore.getState()
+      
+      if (!isLoggedIn) {
+        throw new Error('로그인이 필요한 서비스입니다.')
+      }
 
-      clearCart: () => {
-        set({ localCart: new Map() })
-        get().syncToServer().catch(console.error)
-      },
+      set({ isSyncing: true })
+      try {
+        await updateCartQuantity(cartId, quantity)
+        await get().loadCartItems()
+        await get().loadCartItemCount()
+      } catch (error) {
+        console.error('장바구니 수량 수정 실패:', error)
+        throw error
+      } finally {
+        set({ isSyncing: false })
+      }
+    },
 
-      getCartItems: () => {
-        const { localCart } = get()
-        // 실제로는 상품 정보를 가져와야 하지만, 여기서는 구조만 제공
-        const items: CartItem[] = []
-        localCart.forEach((quantity, productId) => {
-          // 상품 정보는 별도로 가져와야 함
-          items.push({
-            product: {
-              id: productId,
-              name: '',
-              description: '',
-              price: 0,
-              stock: 0,
-            },
-            quantity,
-            addedAt: new Date().toISOString(),
-          })
-        })
-        return items
-      },
+    removeFromCart: async (cartId: number) => {
+      const { isLoggedIn } = useAuthStore.getState()
+      
+      if (!isLoggedIn || cartId === 0) {
+        return
+      }
 
-      getCartTotal: () => {
-        const { localCart } = get()
-        let total = 0
-        localCart.forEach((quantity, productId) => {
-          // 실제로는 상품 가격을 가져와야 함
-          // 여기서는 구조만 제공
-        })
-        return total
-      },
+      set({ isSyncing: true })
+      try {
+        await apiRemoveFromCart(cartId)
+        await get().loadCartItems()
+        await get().loadCartItemCount()
+      } catch (error) {
+        console.error('장바구니 삭제 실패:', error)
+        throw error
+      } finally {
+        set({ isSyncing: false })
+      }
+    },
 
-      mergeWithServerCart: (serverCart) => {
-        set((state) => {
-          const newMap = new Map(state.localCart)
-          // 서버 장바구니와 병합 (서버 우선)
-          serverCart.forEach((item) => {
-            newMap.set(item.product.id, item.quantity)
-          })
-          return { localCart: newMap }
-        })
-      },
+    removeFromCartByProductId: (_productId: string) => {
+      const { isLoggedIn } = useAuthStore.getState()
+      if (!isLoggedIn) {
+        throw new Error('로그인이 필요한 서비스입니다.')
+      }
+    },
 
-      syncToServer: async () => {
-        const { localCart } = get()
-        // 로그인 상태 확인
-        const isLoggedIn = false // 실제로는 인증 상태 확인
-        
-        if (!isLoggedIn) {
-          // 로그인 전: LocalStorage만 사용
-          return
-        }
+    clearCart: async () => {
+      const { isLoggedIn } = useAuthStore.getState()
+      
+      if (!isLoggedIn) {
+        throw new Error('로그인이 필요한 서비스입니다.')
+      }
 
-        set({ isSyncing: true })
-        try {
-          // 서버에 장바구니 동기화
-          // await syncCartToServer(Array.from(localCart.entries()))
-        } catch (error) {
-          console.error('장바구니 동기화 실패:', error)
-        } finally {
-          set({ isSyncing: false })
-        }
-      },
-    }),
-    {
-      name: CART_STORAGE_KEY,
-      // LocalStorage에 Map을 저장하기 위한 커스텀 직렬화
-      serialize: (state) => {
-        const cartArray = Array.from(state.state.localCart.entries())
-        return JSON.stringify({ localCart: cartArray })
-      },
-      deserialize: (str) => {
-        const parsed = JSON.parse(str)
-        return {
-          localCart: new Map(parsed.localCart || []),
-          isSyncing: false,
-        }
-      },
-    }
-  )
+      set({ isSyncing: true })
+      try {
+        await apiClearCart()
+        set({ serverCartItems: [], cartItemCount: 0 })
+      } catch (error) {
+        console.error('장바구니 비우기 실패:', error)
+        throw error
+      } finally {
+        set({ isSyncing: false })
+      }
+    },
+
+    loadCartItems: async () => {
+      const { isLoggedIn } = useAuthStore.getState()
+      
+      if (!isLoggedIn) {
+        return
+      }
+
+      set({ isLoading: true })
+      try {
+        const response: CartListResponse = await apiGetCartItems()
+        const cartItems = response.items.map(convertCartResponseToCartItem)
+        set({ serverCartItems: cartItems })
+      } catch (error) {
+        console.error('장바구니 로드 실패:', error)
+        set({ serverCartItems: [] })
+      } finally {
+        set({ isLoading: false })
+      }
+    },
+
+    loadCartItemCount: async () => {
+      const { isLoggedIn } = useAuthStore.getState()
+      
+      if (!isLoggedIn) {
+        set({ cartItemCount: 0 })
+        return
+      }
+
+      try {
+        const count = await getCartItemCount()
+        set({ cartItemCount: count })
+      } catch (error) {
+        console.error('장바구니 개수 로드 실패:', error)
+        set({ cartItemCount: 0 })
+      }
+    },
+
+    getCartItems: () => {
+      const { isLoggedIn } = useAuthStore.getState()
+      const { serverCartItems } = get()
+      
+      if (!isLoggedIn) {
+        return []
+      }
+      
+      return serverCartItems
+    },
+
+    getCartTotal: () => {
+      const items = get().getCartItems()
+      return items.reduce((total, item) => {
+        return total + (item.product.price * item.quantity)
+      }, 0)
+    },
+  })
 )

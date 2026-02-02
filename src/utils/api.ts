@@ -226,30 +226,171 @@ export const getOrderHistory = async (orderId: string): Promise<OrderInfo & { pa
 }
 
 // 장바구니 관련 API
-export const getCart = async (): Promise<CartItem[]> => {
-  const response = await fetch(`${API_BASE_URL}/cart`, {
+// 백엔드 응답 타입
+export interface CartResponse {
+  id: number
+  userId: number
+  productId: number
+  productName: string
+  productImageUrl?: string
+  productPrice: number
+  stock: number
+  quantity: number
+  totalPrice: number
+  addedAt: string
+}
+
+export interface CartListResponse {
+  items: CartResponse[]
+  totalItems: number
+  totalAmount: number
+}
+
+// 장바구니에 상품 추가
+export const addToCart = async (productId: string, quantity: number = 1): Promise<CartResponse> => {
+  const url = `${API_BASE_URL}/carts`
+  const requestBody = {
+    productId: Number(productId),
+    quantity,
+  }
+  const headers = getAuthHeaders()
+  
+  console.log('장바구니 추가 요청:', {
+    url,
+    method: 'POST',
+    headers,
+    body: requestBody,
+  })
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify(requestBody),
+    })
+
+    console.log('장바구니 추가 응답:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: '장바구니 추가에 실패했습니다.' }))
+      console.error('장바구니 추가 실패:', response.status, errorData)
+      throw new Error(errorData.message || `장바구니 추가에 실패했습니다. (${response.status})`)
+    }
+
+    const result = await response.json()
+    console.log('장바구니 추가 성공:', result)
+    return result
+  } catch (error) {
+    console.error('장바구니 추가 예외:', error)
+    if (error instanceof Error) {
+      throw error
+    }
+    throw new Error('장바구니 추가 중 오류가 발생했습니다.')
+  }
+}
+
+// 장바구니 목록 조회
+export const getCartItems = async (): Promise<CartListResponse> => {
+  const url = `${API_BASE_URL}/carts`
+  const headers = getAuthHeaders()
+  
+  console.log('장바구니 조회 요청:', {
+    url,
+    method: 'GET',
+    headers,
+  })
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+      credentials: 'include',
+    })
+
+    console.log('장바구니 조회 응답:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: '장바구니 조회에 실패했습니다.' }))
+      console.error('장바구니 조회 실패:', response.status, error)
+      throw new Error(error.message || `장바구니 조회에 실패했습니다. (${response.status})`)
+    }
+
+    const result = await response.json()
+    console.log('장바구니 조회 성공:', result)
+    return result
+  } catch (error) {
+    console.error('장바구니 조회 예외:', error)
+    if (error instanceof Error) {
+      throw error
+    }
+    throw new Error('장바구니 조회 중 오류가 발생했습니다.')
+  }
+}
+
+// 장바구니 수량 수정
+export const updateCartQuantity = async (cartId: number, quantity: number): Promise<CartResponse> => {
+  const response = await fetch(`${API_BASE_URL}/carts/${cartId}/quantity?quantity=${quantity}`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
     credentials: 'include',
   })
 
   if (!response.ok) {
-    throw new Error('장바구니 조회에 실패했습니다.')
+    const error = await response.json().catch(() => ({ message: '장바구니 수량 수정에 실패했습니다.' }))
+    throw new Error(error.message || '장바구니 수량 수정에 실패했습니다.')
   }
 
   return response.json()
 }
 
-export const syncCartToServer = async (items: Array<{ productId: string; quantity: number }>): Promise<CartItem[]> => {
-  const response = await fetch(`${API_BASE_URL}/cart/sync`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+// 장바구니 항목 삭제
+export const removeFromCart = async (cartId: number): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/carts/${cartId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
     credentials: 'include',
-    body: JSON.stringify({ items }),
   })
 
   if (!response.ok) {
-    throw new Error('장바구니 동기화에 실패했습니다.')
+    const error = await response.json().catch(() => ({ message: '장바구니 삭제에 실패했습니다.' }))
+    throw new Error(error.message || '장바구니 삭제에 실패했습니다.')
+  }
+}
+
+// 장바구니 전체 비우기
+export const clearCart = async (): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/carts`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: '장바구니 비우기에 실패했습니다.' }))
+    throw new Error(error.message || '장바구니 비우기에 실패했습니다.')
+  }
+}
+
+// 장바구니 항목 개수 조회
+export const getCartItemCount = async (): Promise<number> => {
+  const response = await fetch(`${API_BASE_URL}/carts/count`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    // 에러가 발생해도 0을 반환 (로그인하지 않은 경우 등)
+    return 0
   }
 
   return response.json()
@@ -263,15 +404,81 @@ export const validateCartBeforeCheckout = async (): Promise<{
   outOfStockItems?: string[]
   priceChangedItems?: string[]
 }> => {
-  const response = await fetch(`${API_BASE_URL}/cart/validate`, {
-    credentials: 'include',
-  })
+  try {
+    // 장바구니 목록을 가져와서 검증
+    const cartList = await getCartItems()
+    
+    // CartResponse를 CartItem으로 변환
+    const items: CartItem[] = cartList.items.map((item) => {
+      const cartItem: CartItem = {
+        product: {
+          id: String(item.productId),
+          name: item.productName,
+          description: '',
+          price: item.productPrice,
+          stock: item.stock,
+          imageUrl: item.productImageUrl,
+        },
+        quantity: item.quantity,
+        addedAt: item.addedAt,
+      }
+      if (item.id) {
+        Object.assign(cartItem, { cartId: item.id })
+      }
+      return cartItem
+    })
 
-  if (!response.ok) {
+    const totalAmount = items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0)
+    const outOfStockItems: string[] = []
+    const priceChangedItems: string[] = []
+
+    // 재고 확인
+    items.forEach((item) => {
+      if (item.product.stock < item.quantity) {
+        outOfStockItems.push(item.product.id)
+      }
+    })
+
+    return {
+      isValid: outOfStockItems.length === 0 && priceChangedItems.length === 0,
+      items,
+      totalAmount,
+      outOfStockItems: outOfStockItems.length > 0 ? outOfStockItems : undefined,
+      priceChangedItems: priceChangedItems.length > 0 ? priceChangedItems : undefined,
+    }
+  } catch (error) {
+    console.error('장바구니 검증 실패:', error)
     throw new Error('장바구니 검증에 실패했습니다.')
   }
+}
 
-  return response.json()
+// 기존 API (하위 호환성을 위해 유지)
+export const getCart = async (): Promise<CartItem[]> => {
+  try {
+    const cartListResponse = await getCartItems()
+    // CartListResponse를 CartItem[]로 변환
+    return cartListResponse.items.map((item) => ({
+      product: {
+        id: String(item.productId),
+        name: item.productName,
+        description: '',
+        price: item.productPrice,
+        stock: item.stock,
+        imageUrl: item.productImageUrl,
+      },
+      quantity: item.quantity,
+      addedAt: item.addedAt,
+    }))
+  } catch (error) {
+    throw new Error('장바구니 조회에 실패했습니다.')
+  }
+}
+
+export const syncCartToServer = async (items: Array<{ productId: string; quantity: number }>): Promise<CartItem[]> => {
+  // 각 아이템을 서버에 추가/업데이트
+  const promises = items.map((item) => addToCart(item.productId, item.quantity))
+  await Promise.all(promises)
+  return getCart()
 }
 
 // 최근 본 상품 관련 API
