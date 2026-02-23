@@ -7,9 +7,10 @@ import './AuthModal.css'
 interface AuthModalProps {
   isOpen: boolean
   onClose: () => void
+  onLogoutSuccess?: () => void
 }
 
-const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
+const AuthModal = ({ isOpen, onClose, onLogoutSuccess }: AuthModalProps) => {
   const { isLoggedIn, login, logout, signup } = useAuthStore()
   const [isSignup, setIsSignup] = useState(false)
   const [email, setEmail] = useState('')
@@ -25,7 +26,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
   const [isLoading, setIsLoading] = useState(false)
   const [emailError, setEmailError] = useState<string | null>(null)
   const [isCheckingEmail, setIsCheckingEmail] = useState(false)
-  const emailCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const emailCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // 모달이 열릴 때마다 상태 초기화
   useEffect(() => {
@@ -177,6 +178,9 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
       if (isLoggedIn) {
         await logout()
         onClose()
+        if (onLogoutSuccess) {
+          onLogoutSuccess()
+        }
       } else if (isSignup) {
         // 회원가입 시 유효성 검사
         if (emailError) {
@@ -242,18 +246,20 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     onClose()
   }
 
+  if (!isOpen) return null
+
   // 로그아웃 모달
   if (isLoggedIn) {
     return (
-      <div className="modal-overlay" onClick={handleClose}>
-        <div className="modal-content auth-modal" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-header">
+      <div className="auth-modal-overlay" onClick={handleClose}>
+        <div className="auth-modal-content auth-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="auth-modal-header">
             <h2>로그아웃</h2>
-            <button className="modal-close-btn" onClick={handleClose}>
+            <button className="auth-modal-close-btn" onClick={handleClose}>
               ✕
             </button>
           </div>
-          <div className="modal-body">
+          <div className="auth-modal-body">
             <p className="logout-message">정말 로그아웃 하시겠습니까?</p>
             <div className="auth-actions">
               <Button variant="secondary" onClick={handleClose} fullWidth>
@@ -265,6 +271,9 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                   try {
                     await logout()
                     handleClose()
+                    if (onLogoutSuccess) {
+                      onLogoutSuccess()
+                    }
                   } catch (err) {
                     console.error('로그아웃 실패:', err)
                   }
@@ -283,15 +292,15 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
 
   // 로그인/회원가입 모달
   return (
-    <div className="modal-overlay" onClick={handleClose}>
-      <div className="modal-content auth-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
+    <div className="auth-modal-overlay" onClick={handleClose}>
+      <div className="auth-modal-content auth-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="auth-modal-header">
           <h2>{isSignup ? '회원가입' : '로그인'}</h2>
-          <button className="modal-close-btn" onClick={handleClose}>
+          <button className="auth-modal-close-btn" onClick={handleClose}>
             ✕
           </button>
         </div>
-        <div className="modal-body">
+        <div className="auth-modal-body">
           <form className="auth-form" onSubmit={handleSubmit}>
             {error && <div className="error-message">{error}</div>}
             {isSignup && (

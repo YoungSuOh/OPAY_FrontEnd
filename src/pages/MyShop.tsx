@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Product, ShippingAddress } from '../types'
-import { getOrderList } from '../utils/api'
+import { Product, ShippingAddress, RecentProduct } from '../types'
+import { getOrderList, getUserInfo, getDefaultShippingAddress, getShippingAddresses, getWalletBalance, getTransactions, addShippingAddress, updateShippingAddress, deleteShippingAddress, setDefaultShippingAddress, getTotalOrderCount, getMonthlyOrderCount } from '../utils/api'
 import { useAuthStore } from '../store/authStore'
 import { useRecentProductsStore } from '../store/recentProductsStore'
 import { getProduct } from '../utils/api'
@@ -10,6 +10,8 @@ import CartButton from '../components/CartButton'
 import AddressModal from '../components/AddressModal'
 import Header from '../components/Header'
 import AuthModal from '../components/AuthModal'
+import WalletChargeModal from '../components/WalletChargeModal'
+import ConfirmModal from '../components/ConfirmModal'
 import './MyShop.css'
 
 interface RecentPayment {
@@ -28,242 +30,119 @@ const MyShop = () => {
   const { recentProducts } = useRecentProductsStore()
   const [recentPayments, setRecentPayments] = useState<RecentPayment[]>([])
   const [recentViewedProducts, setRecentViewedProducts] = useState<Product[]>([])
-  const [userPoint] = useState(412)
-  const [userMoney] = useState(3114)
+  const [userPoint, setUserPoint] = useState(0)
+  const [userMoney, setUserMoney] = useState(0)
   const [monthlyOrderCount, setMonthlyOrderCount] = useState(0)
   const [totalOrderCount, setTotalOrderCount] = useState(0)
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false)
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
-  // 로그인 체크 (컴포넌트 마운트 시 한 번만 실행)
+  const [isWalletChargeModalOpen, setIsWalletChargeModalOpen] = useState(false)
+  const [isLoginConfirmModalOpen, setIsLoginConfirmModalOpen] = useState(false)
+  const [defaultAddress, setDefaultAddress] = useState<ShippingAddress | null>(null)
+  const [addresses, setAddresses] = useState<ShippingAddress[]>([])
+  const [defaultAddressId, setDefaultAddressId] = useState<string | null>(null)
+  
+  // 비로그인 시 마이쇼핑 진입할 때마다 로그인 확인 모달 표시
   useEffect(() => {
-    // 이미 확인했거나 로그인되어 있으면 실행하지 않음
-    const hasChecked = sessionStorage.getItem('myshop_login_checked')
-    if (hasChecked === 'true' || isLoggedIn) {
+    const isLogout = sessionStorage.getItem('is_logging_out')
+    if (isLogout === 'true') {
+      sessionStorage.removeItem('is_logging_out')
       return
     }
-    
-    // 확인 표시
-    sessionStorage.setItem('myshop_login_checked', 'true')
-    const shouldLogin = window.confirm('로그인이 필요한 서비스입니다. 로그인을 하시겠습니까?')
-    if (shouldLogin) {
-      setIsAuthModalOpen(true)
-    } else {
-      navigate('/')
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // 빈 의존성 배열로 마운트 시 한 번만 실행
-  
-  // 로그인 성공 시 모달 닫기 및 체크 플래그 초기화
-  useEffect(() => {
     if (isLoggedIn) {
-      if (isAuthModalOpen) {
-        setIsAuthModalOpen(false)
-      }
-      // 로그인 성공 시 체크 플래그 초기화 (다음 방문 시 다시 확인 가능)
-      sessionStorage.removeItem('myshop_login_checked')
+      return
+    }
+    setIsLoginConfirmModalOpen(true)
+  }, [isLoggedIn])
+
+  // 로그인 성공 시 Auth 모달 닫기
+  useEffect(() => {
+    if (isLoggedIn && isAuthModalOpen) {
+      setIsAuthModalOpen(false)
     }
   }, [isLoggedIn, isAuthModalOpen])
   
-  if (!isLoggedIn) {
-    return (
-      <>
-        <Header showSearch={true} showQButton={false} />
-        <AuthModal isOpen={isAuthModalOpen} onClose={() => {
-          setIsAuthModalOpen(false)
-          if (!isLoggedIn) {
-            navigate('/')
-          }
-        }} />
-      </>
-    )
-  }
-  const [addresses, setAddresses] = useState<ShippingAddress[]>([
-    {
-      id: '1',
-      name: '집',
-      recipient: '오영수',
-      phone: '010-1234-5678',
-      address: '경기도 성남시 분당구 발이봉남로31번길 10',
-      detailAddress: '3층',
-      postalCode: '13558',
-      isDefault: true,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: '2',
-      name: '회사',
-      recipient: '오영수',
-      phone: '010-1234-5678',
-      address: '서울시 강남구 테헤란로 123',
-      detailAddress: '10층',
-      postalCode: '06142',
-      isDefault: false,
-      createdAt: new Date().toISOString(),
-    },
-  ])
-  const [defaultAddressId, setDefaultAddressId] = useState<string>('1')
-
+  // 데이터 로드 useEffect (모든 hooks는 early return 이전에 선언되어야 함)
   useEffect(() => {
-    // 최근 결제 내역 로드
-    const loadRecentPayments = async () => {
+    // 로그인하지 않은 경우 데이터 로드하지 않음
+    if (!isLoggedIn) {
+      return
+    }
+    const loadUserInfo = async () => {
       try {
-        const data = await getOrderList(1, 5)
-        const payments: RecentPayment[] = data.orders.map((order) => ({
-          orderId: order.orderId,
-          productName: order.items[0]?.product.name || '상품',
-          amount: order.totalAmount,
-          status: order.deliveryStatus === 'DELIVERED' ? 'CONFIRMED' : 'COMPLETED',
-          paidAt: order.createdAt,
-          pointEarned: Math.floor(order.totalAmount * 0.025), // 2.5% 적립
-        }))
-        setRecentPayments(payments)
+        const userInfo = await getUserInfo()
+        setUserPoint(userInfo.point)
+        setUserMoney(userInfo.money)
       } catch (error) {
-        // 샘플 데이터
-        const now = new Date()
-        setRecentPayments([
-          {
-            orderId: 'ORDER-001',
-            productName: '프리미엄 플랜',
-            amount: 9900,
-            status: 'CONFIRMED',
-            paidAt: now.toISOString(),
-            pointEarned: 247,
-          },
-          {
-            orderId: 'ORDER-002',
-            productName: '베이직 플랜',
-            amount: 4900,
-            status: 'COMPLETED',
-            paidAt: new Date(now.getTime() - 3600000).toISOString(),
-            pointEarned: 122,
-          },
-          {
-            orderId: 'ORDER-003',
-            productName: '스타터 플랜',
-            amount: 2900,
-            status: 'CONFIRMED',
-            paidAt: new Date(now.getTime() - 7200000).toISOString(),
-            pointEarned: 72,
-          },
-          {
-            orderId: 'ORDER-004',
-            productName: '프리미엄 플랜',
-            amount: 9900,
-            status: 'COMPLETED',
-            paidAt: new Date(now.getTime() - 10800000).toISOString(),
-            pointEarned: 247,
-          },
-          {
-            orderId: 'ORDER-005',
-            productName: '베이직 플랜',
-            amount: 4900,
-            status: 'CONFIRMED',
-            paidAt: new Date(now.getTime() - 14400000).toISOString(),
-            pointEarned: 122,
-          },
-          {
-            orderId: 'ORDER-006',
-            productName: '스타터 플랜',
-            amount: 2900,
-            status: 'COMPLETED',
-            paidAt: new Date(now.getTime() - 18000000).toISOString(),
-            pointEarned: 72,
-          },
-        ])
+        console.error('사용자 정보 로드 실패:', error)
       }
     }
 
-    // 최근 조회한 상품 로드
+    const loadDefaultAddress = async () => {
+      try {
+        const address = await getDefaultShippingAddress()
+        if (address) {
+          setDefaultAddress(address)
+          setDefaultAddressId(address.id)
+        }
+        const allAddresses = await getShippingAddresses()
+        setAddresses(allAddresses)
+      } catch (error) {
+        console.error('배송지 로드 실패:', error)
+      }
+    }
+
+    const loadRecentTransactions = async () => {
+      // 최근 결제 내역은 주문 목록으로 로드해 상품명·이미지(productImageUrl)를 확실히 표시
+      try {
+        const data = await getOrderList(1, 5)
+        const payments: RecentPayment[] = data.orders.map((order) => {
+          const firstItem = order.items?.[0] as { product?: { name?: string; imageUrl?: string }; productName?: string; productImageUrl?: string } | undefined
+          const imgUrl = firstItem?.productImageUrl ?? firstItem?.product?.imageUrl
+          const productName = firstItem?.productName ?? firstItem?.product?.name ?? '상품'
+          return {
+            orderId: order.orderId,
+            productName,
+            amount: order.totalAmount,
+            status: order.deliveryStatus === 'DELIVERED' ? 'CONFIRMED' : 'COMPLETED',
+            paidAt: order.createdAt,
+            pointEarned: Math.floor(order.totalAmount * 0.025),
+            imageUrl: imgUrl || undefined,
+          }
+        })
+        setRecentPayments(payments)
+      } catch (error) {
+        console.error('최근 주문 내역 로드 실패:', error)
+        try {
+          const data = await getTransactions(0, 5)
+          const payments: RecentPayment[] = data.content
+            .filter((t) => t.type === 'PAYMENT' || t.type === 'CHARGE')
+            .slice(0, 5)
+            .map((t) => ({
+              orderId: t.orderId ? String(t.orderId) : `TXN-${t.transactionId}`,
+              productName: t.type === 'CHARGE' ? '머니 충전' : '상품 구매',
+              amount: t.amount,
+              status: t.status === 'COMPLETED' ? 'CONFIRMED' : t.status === 'PENDING' ? 'PROCESSING' : 'COMPLETED',
+              paidAt: t.createdAt,
+              pointEarned: t.type === 'PAYMENT' ? Math.floor(t.amount * 0.025) : undefined,
+              imageUrl: undefined,
+            }))
+          setRecentPayments(payments)
+        } catch (orderError) {
+          console.error('주문 내역 로드 실패:', orderError)
+          setRecentPayments([])
+        }
+      }
+    }
+
     const loadRecentViewedProducts = async () => {
       if (recentProducts.length === 0) {
-        // 더미 데이터 (확인용)
-        setRecentViewedProducts([
-          {
-            id: '1',
-            name: '프리미엄 플랜',
-            description: '모든 기능을 사용할 수 있는 프리미엄 플랜입니다.',
-            price: 9900,
-            stock: 100,
-            averageRating: 5.0,
-            reviewCount: 7,
-            imageUrl: 'https://picsum.photos/200/200?random=1',
-          },
-          {
-            id: '2',
-            name: '베이직 플랜',
-            description: '기본 기능을 사용할 수 있는 베이직 플랜입니다.',
-            price: 4900,
-            stock: 50,
-            averageRating: 4.8,
-            reviewCount: 4475,
-            imageUrl: 'https://picsum.photos/200/200?random=2',
-          },
-          {
-            id: '3',
-            name: '스타터 플랜',
-            description: '시작하기 좋은 스타터 플랜입니다.',
-            price: 2900,
-            stock: 30,
-            averageRating: 4.8,
-            reviewCount: 630,
-            imageUrl: 'https://picsum.photos/200/200?random=3',
-          },
-          {
-            id: '4',
-            name: '프리미엄 플랜',
-            description: '모든 기능을 사용할 수 있는 프리미엄 플랜입니다.',
-            price: 9900,
-            stock: 100,
-            averageRating: 5.0,
-            reviewCount: 7,
-            imageUrl: 'https://picsum.photos/200/200?random=4',
-          },
-          {
-            id: '5',
-            name: '베이직 플랜',
-            description: '기본 기능을 사용할 수 있는 베이직 플랜입니다.',
-            price: 4900,
-            stock: 50,
-            averageRating: 4.8,
-            reviewCount: 4475,
-            imageUrl: 'https://picsum.photos/200/200?random=5',
-          },
-          {
-            id: '6',
-            name: '스타터 플랜',
-            description: '시작하기 좋은 스타터 플랜입니다.',
-            price: 2900,
-            stock: 30,
-            averageRating: 4.8,
-            reviewCount: 630,
-            imageUrl: 'https://picsum.photos/200/200?random=6',
-          },
-          {
-            id: '7',
-            name: '프리미엄 플랜',
-            description: '모든 기능을 사용할 수 있는 프리미엄 플랜입니다.',
-            price: 9900,
-            stock: 100,
-            averageRating: 5.0,
-            reviewCount: 7,
-            imageUrl: 'https://picsum.photos/200/200?random=7',
-          },
-          {
-            id: '8',
-            name: '베이직 플랜',
-            description: '기본 기능을 사용할 수 있는 베이직 플랜입니다.',
-            price: 4900,
-            stock: 50,
-            averageRating: 4.8,
-            reviewCount: 4475,
-            imageUrl: 'https://picsum.photos/200/200?random=8',
-          },
-        ])
+        setRecentViewedProducts([])
         return
       }
       try {
         const productDetails = await Promise.all(
-          recentProducts.slice(0, 10).map(async (rp) => {
+          recentProducts.slice(0, 10).map(async (rp: RecentProduct) => {
             try {
               const product = await getProduct(rp.productId)
               return product
@@ -280,35 +159,28 @@ const MyShop = () => {
       }
     }
 
-    // 주문 통계 로드
     const loadOrderStats = async () => {
       try {
-        // 이달의 주문 건수
-        const monthlyData = await getOrderList(1, 1000) // 충분히 큰 수로 전체 조회
-        const now = new Date()
-        const currentMonth = now.getMonth()
-        const currentYear = now.getFullYear()
-        
-        const monthlyOrders = monthlyData.orders.filter((order) => {
-          const orderDate = new Date(order.createdAt)
-          return (
-            orderDate.getMonth() === currentMonth &&
-            orderDate.getFullYear() === currentYear
-          )
-        })
-        setMonthlyOrderCount(monthlyOrders.length)
-        setTotalOrderCount(monthlyData.orders.length)
+        const [monthlyCount, totalCount] = await Promise.all([
+          getMonthlyOrderCount(),
+          getTotalOrderCount(),
+        ])
+        setMonthlyOrderCount(monthlyCount)
+        setTotalOrderCount(totalCount)
       } catch (error) {
-        // 샘플 데이터
-        setMonthlyOrderCount(3)
-        setTotalOrderCount(12)
+        console.error('주문 통계 로드 실패:', error)
+        // 에러 발생 시 기본값 설정
+        setMonthlyOrderCount(0)
+        setTotalOrderCount(0)
       }
     }
 
-    loadRecentPayments()
+    loadUserInfo()
+    loadDefaultAddress()
+    loadRecentTransactions()
     loadRecentViewedProducts()
     loadOrderStats()
-  }, [recentProducts])
+  }, [])
 
   const getStatusLabel = (status: RecentPayment['status']) => {
     switch (status) {
@@ -328,6 +200,37 @@ const MyShop = () => {
     return `${date.getFullYear()}. ${date.getMonth() + 1}. ${date.getDate()}. ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`
   }
 
+  // early return은 모든 hooks 선언 이후에 위치해야 함
+  if (!isLoggedIn) {
+    return (
+      <>
+        <Header showSearch={true} showQButton={false} />
+        {isLoginConfirmModalOpen && (
+          <ConfirmModal
+            isOpen={true}
+            message="로그인이 필요한 서비스입니다. 로그인을 하시겠습니까?"
+            confirmText="로그인"
+            cancelText="취소"
+            onConfirm={() => {
+              setIsLoginConfirmModalOpen(false)
+              setIsAuthModalOpen(true)
+            }}
+            onCancel={() => {
+              setIsLoginConfirmModalOpen(false)
+              navigate('/')
+            }}
+          />
+        )}
+        <AuthModal isOpen={isAuthModalOpen} onClose={() => {
+          setIsAuthModalOpen(false)
+          if (!isLoggedIn) {
+            navigate('/')
+          }
+        }} />
+      </>
+    )
+  }
+
   return (
     <div className="my-shop-page">
       {/* 상단 헤더 */}
@@ -337,37 +240,46 @@ const MyShop = () => {
         {/* 메인 콘텐츠 영역 */}
         <div className="main-content">         
 
-          {/* 최근 결제 내역 */}
+          {/* 최근 결제 내역 (최근 5건, 더보기 → /order-history) */}
           <div className="recent-payments-section">
-            <h2 className="section-title">최근 결제 내역</h2>
+            <div className="recent-payments-section-header">
+              <h2 className="section-title">최근 결제 내역</h2>
+              <button
+                type="button"
+                className="recent-payments-more-btn"
+                onClick={() => navigate('/order-history')}
+              >
+                더보기
+              </button>
+            </div>
             <div className="payments-list">
-              {recentPayments.map((payment) => (
-                <div key={payment.orderId} className="payment-item">
-                  <div className="payment-header">
-                    <span className="payment-status">{getStatusLabel(payment.status)}</span>
-                    <span className="payment-date">{formatDate(payment.paidAt)}</span>
+              {recentPayments.slice(0, 5).map((payment) => (
+                <div
+                  key={payment.orderId}
+                  className="payment-item"
+                  onClick={() => navigate(`/order-history?orderId=${payment.orderId}`)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && navigate(`/order-history?orderId=${payment.orderId}`)}
+                >
+                  <div className="payment-item-image-wrap">
+                    {payment.imageUrl ? (
+                      <img src={payment.imageUrl} alt={payment.productName} className="payment-item-image" />
+                    ) : (
+                      <span className="payment-item-image-placeholder">{payment.productName.charAt(0)}</span>
+                    )}
                   </div>
-                  <div className="payment-body">
-                    <div className="payment-info">
-                      <h3 className="payment-product-name">{payment.productName}</h3>
-                      <div className="payment-amount">{payment.amount.toLocaleString()}원</div>
-                      {payment.pointEarned && (
-                        <div className="payment-point">
-                          {payment.pointEarned}원 적립 완료
-                        </div>
-                      )}
+                  <div className="payment-item-content">
+                    <h3 className="payment-product-name">{payment.productName}</h3>
+                    <div className="payment-meta">
+                      <span className="payment-date">{formatDate(payment.paidAt)}</span>
+                      <span className="payment-status">{getStatusLabel(payment.status)}</span>
                     </div>
+                    <div className="payment-amount">{payment.amount.toLocaleString()}원</div>
+                    {payment.pointEarned != null && payment.pointEarned > 0 && (
+                      <div className="payment-point">{payment.pointEarned}원 적립</div>
+                    )}
                   </div>
-                  {payment.status === 'COMPLETED' && (
-                    <div className="payment-actions">
-                      <Button
-                        variant="secondary"
-                        onClick={() => navigate(`/order-history?orderId=${payment.orderId}`)}
-                      >
-                        포인트 뽑기
-                      </Button>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
@@ -458,26 +370,27 @@ const MyShop = () => {
                   변경
                 </button>
               </div>
-              {(() => {
-                const defaultAddress = addresses.find((addr) => addr.id === defaultAddressId) || addresses.find((addr) => addr.isDefault)
-                if (!defaultAddress) return null
-                return (
-                  <div className="default-address-info">
-                    <div className="default-address-name">
-                      {defaultAddress.name}
-                      {defaultAddress.isDefault && (
-                        <span className="default-badge-small">기본</span>
-                      )}
-                    </div>
-                    <div className="default-address-recipient">
-                      {defaultAddress.recipient} ({defaultAddress.phone})
-                    </div>
-                    <div className="default-address-full">
-                      ({defaultAddress.postalCode}) {defaultAddress.address} {defaultAddress.detailAddress}
-                    </div>
+              {defaultAddress ? (
+                <div className="default-address-info">
+                  <div className="default-address-name">
+                    {defaultAddress.name || '기본 배송지'}
+                    {defaultAddress.isDefault && (
+                      <span className="default-badge-small">기본</span>
+                    )}
                   </div>
-                )
-              })()}
+                  <div className="default-address-recipient">
+                    {defaultAddress.recipient} ({defaultAddress.phone})
+                  </div>
+                  <div className="default-address-full">
+                    {defaultAddress.postalCode && `(${defaultAddress.postalCode}) `}
+                    {defaultAddress.address} {defaultAddress.detailAddress || ''}
+                  </div>
+                </div>
+              ) : (
+                <div className="default-address-info" style={{ color: '#999' }}>
+                  등록된 배송지가 없습니다.
+                </div>
+              )}
             </div>
           </div>
 
@@ -485,10 +398,8 @@ const MyShop = () => {
           <div className="my-shopping">
             <h3 className="sidebar-title">마이쇼핑</h3>
             <ul className="shopping-links">
-              <li><a href="#" onClick={(e) => { e.preventDefault(); navigate('/orders'); }}>주문내역</a></li>
-              <li><a href="#" onClick={(e) => { e.preventDefault(); navigate('/'); }}>찜한상품</a></li>
-              <li><a href="#" onClick={(e) => { e.preventDefault(); navigate('/'); }}>최근본상품</a></li>
-              <li><a href="#" onClick={(e) => { e.preventDefault(); navigate('/products/1'); }}>상품리뷰</a></li>
+              <li><a href="#" onClick={(e) => { e.preventDefault(); navigate('/order-history'); }}>주문내역</a></li>
+              <li><a href="#" onClick={(e) => { e.preventDefault(); navigate('/my-reviews'); }}>내가 쓴 리뷰</a></li>
             </ul>
           </div>
 
@@ -496,9 +407,7 @@ const MyShop = () => {
           <div className="quick-menu">
             <h3 className="sidebar-title">빠른 메뉴</h3>
             <ul className="menu-links">
-              <li><a href="#">포인트내역</a></li>
-              <li><a href="#">머니 내역</a></li>
-              <li><a href="#">머니 충전</a></li>
+              <li><a href="#" onClick={(e) => { e.preventDefault(); setIsWalletChargeModalOpen(true); }}>머니 충전</a></li>
             </ul>
           </div>
         </div>
@@ -511,36 +420,65 @@ const MyShop = () => {
         isOpen={isAddressModalOpen}
         onClose={() => setIsAddressModalOpen(false)}
         addresses={addresses}
-        selectedAddressId={defaultAddressId}
+        selectedAddressId={defaultAddressId || undefined}
         onSelectAddress={(addressId) => {
           setDefaultAddressId(addressId)
           setIsAddressModalOpen(false)
         }}
-        onAddAddress={(address) => {
-          const newAddress: ShippingAddress = {
-            ...address,
-            id: Date.now().toString(),
-            createdAt: new Date().toISOString(),
+        onAddAddress={async (address) => {
+          try {
+            const newAddress = await addShippingAddress({
+              name: address.name || null,
+              recipient: address.recipient,
+              phone: address.phone,
+              address: address.address,
+              detailAddress: address.detailAddress || null,
+              postalCode: address.postalCode || null,
+              isDefault: address.isDefault || false,
+            })
+            
+            // 기본 배송지로 설정하는 경우
+            if (newAddress.isDefault) {
+              setDefaultAddress(newAddress)
+              setDefaultAddressId(newAddress.id)
+            }
+            
+            // 전체 배송지 목록 다시 로드
+            const allAddresses = await getShippingAddresses()
+            setAddresses(allAddresses)
+          } catch (error) {
+            console.error('배송지 추가 실패:', error)
+            alert('배송지 추가에 실패했습니다.')
           }
-          
-          // 기본 배송지로 설정하는 경우 기존 기본 배송지 해제
-          if (address.isDefault) {
-            setAddresses((prev) =>
-              prev.map((addr) => ({ ...addr, isDefault: false }))
-            )
-            setDefaultAddressId(newAddress.id)
-          }
-          
-          setAddresses((prev) => [...prev, newAddress])
         }}
-        onSetDefault={(addressId) => {
-          setAddresses((prev) =>
-            prev.map((addr) => ({
-              ...addr,
-              isDefault: addr.id === addressId,
-            }))
-          )
-          setDefaultAddressId(addressId)
+        onSetDefault={async (addressId) => {
+          try {
+            const updatedAddress = await setDefaultShippingAddress(addressId)
+            setDefaultAddress(updatedAddress)
+            setDefaultAddressId(addressId)
+            
+            // 전체 배송지 목록 다시 로드
+            const allAddresses = await getShippingAddresses()
+            setAddresses(allAddresses)
+          } catch (error) {
+            console.error('기본 배송지 설정 실패:', error)
+            alert('기본 배송지 설정에 실패했습니다.')
+          }
+        }}
+      />
+
+      {/* 머니 충전 모달 */}
+      <WalletChargeModal
+        isOpen={isWalletChargeModalOpen}
+        onClose={() => setIsWalletChargeModalOpen(false)}
+        onChargeSuccess={async () => {
+          // 충전 성공 후 잔액 갱신
+          try {
+            const balance = await getWalletBalance()
+            setUserMoney(balance)
+          } catch (error) {
+            console.error('잔액 갱신 실패:', error)
+          }
         }}
       />
     </div>

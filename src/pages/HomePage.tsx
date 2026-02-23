@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCartStore } from '../store/cartStore'
 import { useAuthStore } from '../store/authStore'
@@ -9,6 +9,7 @@ import CartButton from '../components/CartButton'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Toast from '../components/Toast'
 import AuthModal from '../components/AuthModal'
+import ConfirmModal from '../components/ConfirmModal'
 import './HomePage.css'
 
 // 카테고리 목록
@@ -46,10 +47,11 @@ const HomePage = () => {
   const [isRecommendedTransitioning, setIsRecommendedTransitioning] = useState(false)
   const [showToast, setShowToast] = useState(false)
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+  const [isLoginConfirmModalOpen, setIsLoginConfirmModalOpen] = useState(false)
 
   const ITEMS_PER_PAGE = 3 // 페이지당 표시할 상품 수
-  const totalSpecialPages = Math.ceil(specialProducts.length / ITEMS_PER_PAGE)
-  const totalRecommendedPages = Math.ceil(recommendedProducts.length / ITEMS_PER_PAGE)
+  const totalSpecialPages = useMemo(() => Math.ceil(specialProducts.length / ITEMS_PER_PAGE), [specialProducts.length])
+  const totalRecommendedPages = useMemo(() => Math.ceil(recommendedProducts.length / ITEMS_PER_PAGE), [recommendedProducts.length])
 
   useEffect(() => {
     // 오늘의 판매자 특가 상품 로드 (리뷰 많은 순으로 상위 9개 - 3페이지 분량)
@@ -120,10 +122,10 @@ const HomePage = () => {
     loadCategoryProducts()
   }, [])
 
-  const handleAddToCart = async (product: Product) => {
+  const handleAddToCart = useCallback(async (product: Product) => {
     try {
       if (!isLoggedIn) {
-        setIsAuthModalOpen(true)
+        setIsLoginConfirmModalOpen(true)
         return
       }
       await addToCart(product, 1)
@@ -136,9 +138,9 @@ const HomePage = () => {
         alert('장바구니 추가에 실패했습니다.')
       }
     }
-  }
+  }, [isLoggedIn, addToCart])
 
-  const handleSpecialNext = () => {
+  const handleSpecialNext = useCallback(() => {
     if (specialPage < totalSpecialPages && !isTransitioning) {
       setIsTransitioning(true)
       setTimeout(() => {
@@ -146,9 +148,9 @@ const HomePage = () => {
         setIsTransitioning(false)
       }, 300)
     }
-  }
+  }, [specialPage, totalSpecialPages, isTransitioning])
 
-  const handleSpecialPrev = () => {
+  const handleSpecialPrev = useCallback(() => {
     if (specialPage > 1 && !isTransitioning) {
       setIsTransitioning(true)
       setTimeout(() => {
@@ -156,9 +158,9 @@ const HomePage = () => {
         setIsTransitioning(false)
       }, 300)
     }
-  }
+  }, [specialPage, isTransitioning])
 
-  const handleRecommendedNext = () => {
+  const handleRecommendedNext = useCallback(() => {
     if (recommendedPage < totalRecommendedPages && !isRecommendedTransitioning) {
       setIsRecommendedTransitioning(true)
       setTimeout(() => {
@@ -166,9 +168,9 @@ const HomePage = () => {
         setIsRecommendedTransitioning(false)
       }, 300)
     }
-  }
+  }, [recommendedPage, totalRecommendedPages, isRecommendedTransitioning])
 
-  const handleRecommendedPrev = () => {
+  const handleRecommendedPrev = useCallback(() => {
     if (recommendedPage > 1 && !isRecommendedTransitioning) {
       setIsRecommendedTransitioning(true)
       setTimeout(() => {
@@ -176,10 +178,10 @@ const HomePage = () => {
         setIsRecommendedTransitioning(false)
       }, 300)
     }
-  }
+  }, [recommendedPage, isRecommendedTransitioning])
 
-  const displayedCategory = selectedCategory || CATEGORIES[0].id
-  const currentProducts = categoryProducts[displayedCategory] || []
+  const displayedCategory = useMemo(() => selectedCategory || CATEGORIES[0].id, [selectedCategory])
+  const currentProducts = useMemo(() => categoryProducts[displayedCategory] || [], [categoryProducts, displayedCategory])
 
   return (
     <div className="home-page">
@@ -415,6 +417,23 @@ const HomePage = () => {
       </div>
 
       <CartButton />
+
+      {/* 로그인 확인 모달 */}
+      {isLoginConfirmModalOpen && (
+        <ConfirmModal
+          isOpen={true}
+          message="로그인이 필요한 서비스입니다. 로그인을 하시겠습니까?"
+          confirmText="로그인"
+          cancelText="취소"
+          onConfirm={() => {
+            setIsLoginConfirmModalOpen(false)
+            setIsAuthModalOpen(true)
+          }}
+          onCancel={() => {
+            setIsLoginConfirmModalOpen(false)
+          }}
+        />
+      )}
 
       {/* 토스트 알림 */}
       <Toast

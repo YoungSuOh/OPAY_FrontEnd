@@ -19,9 +19,7 @@ const PaymentStatusCheckPage = () => {
   useBlockBackNavigation(true)
 
   useEffect(() => {
-    // UI 확인을 위해 샘플 데이터 사용
     if (!currentOrder || !currentOrder.paymentId) {
-      // 샘플 데이터로 표시만 함 (API 호출은 하지 않음)
       return
     }
 
@@ -45,7 +43,7 @@ const PaymentStatusCheckPage = () => {
         setPaymentResult(result)
         setPollingCount((prev) => prev + 1)
 
-        // 상태에 따라 페이지 이동 (UI 확인 모드에서는 자동 이동 안 함)
+        // 상태에 따라 페이지 이동
         // if (result.status === 'SUCCESS') {
         //   if (pollingInterval) {
         //     clearInterval(pollingInterval)
@@ -61,7 +59,7 @@ const PaymentStatusCheckPage = () => {
       } catch (err) {
         console.error('결제 상태 조회 실패:', err)
         if (isMounted) {
-          setError('결제 상태 조회 중 오류가 발생했습니다. (UI 확인 모드)')
+          setError('결제 상태 조회 중 오류가 발생했습니다.')
         }
       }
     }

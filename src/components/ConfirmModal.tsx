@@ -3,6 +3,7 @@ import './ConfirmModal.css'
 interface ConfirmModalProps {
   isOpen: boolean
   message: string
+  title?: string
   confirmText?: string
   cancelText?: string
   onConfirm: () => void
@@ -12,6 +13,7 @@ interface ConfirmModalProps {
 const ConfirmModal = ({
   isOpen,
   message,
+  title = '확인',
   confirmText = '확인',
   cancelText = '취소',
   onConfirm,
@@ -24,7 +26,7 @@ const ConfirmModal = ({
       <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
         <div className="confirm-modal-content">
           <div className="confirm-modal-icon">⚠️</div>
-          <h3 className="confirm-modal-title">확인</h3>
+          <h3 className="confirm-modal-title">{title}</h3>
           <p className="confirm-modal-message">{message}</p>
         </div>
         <div className="confirm-modal-actions">

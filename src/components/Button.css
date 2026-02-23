@@ -22,14 +22,15 @@
 }
 
 .btn-secondary {
-  background: white;
-  color: var(--sky-blue-600);
-  border: 2px solid var(--sky-blue-600);
+  background: #f8fafc;
+  color: #64748b;
 }
 
-.btn-secondary:hover:not(:disabled) {
-  background: var(--sky-blue-50);
+.btn-secondary:hover {
+  color: var(--sky-blue-600);
 }
+
+
 
 .btn-danger {
   background: #ef4444;

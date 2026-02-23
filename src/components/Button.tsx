@@ -1,4 +1,4 @@
-import { ReactNode, ButtonHTMLAttributes } from 'react'
+import { memo, ReactNode, ButtonHTMLAttributes } from 'react'
 import './Button.css'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -7,7 +7,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   fullWidth?: boolean
 }
 
-const Button = ({ children, variant = 'primary', fullWidth = false, className = '', ...props }: ButtonProps) => {
+const Button = memo(({ children, variant = 'primary', fullWidth = false, className = '', ...props }: ButtonProps) => {
   return (
     <button
       className={`btn btn-${variant} ${fullWidth ? 'btn-full-width' : ''} ${className}`}
@@ -16,6 +16,8 @@ const Button = ({ children, variant = 'primary', fullWidth = false, className = 
       {children}
     </button>
   )
-}
+})
+
+Button.displayName = 'Button'
 
 export default Button

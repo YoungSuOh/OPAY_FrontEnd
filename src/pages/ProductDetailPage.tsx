@@ -4,28 +4,30 @@ import { useCartStore } from '../store/cartStore'
 import { useAuthStore } from '../store/authStore'
 import { useRecentProductsStore } from '../store/recentProductsStore'
 import { Product, Review } from '../types'
-import { getProduct, getProductReviews, createReview } from '../utils/api'
+import { getProduct, getProductReviews } from '../utils/api'
 import Button from '../components/Button'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Header from '../components/Header'
 import CartButton from '../components/CartButton'
 import AuthModal from '../components/AuthModal'
 import Toast from '../components/Toast'
+import ConfirmModal from '../components/ConfirmModal'
 import './ProductDetailPage.css'
 
 const ProductDetailPage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { isLoggedIn } = useAuthStore()
+  const { isLoggedIn, user } = useAuthStore()
   const { addToCart } = useCartStore()
   const { addRecentProduct } = useRecentProductsStore()
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
   const [showToast, setShowToast] = useState(false)
+  const [isLoginConfirmModalOpen, setIsLoginConfirmModalOpen] = useState(false)
   
   const [product, setProduct] = useState<Product | null>(null)
   const [reviews, setReviews] = useState<Review[]>([])
   const [hasMore, setHasMore] = useState(true)
-  const [page, setPage] = useState(1)
+  const [reviewPage, setReviewPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingReviews, setIsLoadingReviews] = useState(false)
 
@@ -56,13 +58,14 @@ const ProductDetailPage = () => {
     const loadReviews = async () => {
       setIsLoadingReviews(true)
       try {
-        const data = await getProductReviews(id, page, 10)
-        if (page === 1) {
-          setReviews(data.reviews)
+        const pageIndex = reviewPage - 1
+        const data = await getProductReviews(id, pageIndex, 10)
+        if (reviewPage === 1) {
+          setReviews(data.reviews ?? [])
         } else {
-          setReviews((prev) => [...prev, ...data.reviews])
+          setReviews((prev) => [...prev, ...(data.reviews ?? [])])
         }
-        setHasMore(data.hasMore)
+        setHasMore(data.hasMore ?? false)
       } catch (error) {
         console.error('리뷰 로드 실패:', error)
         setReviews([])
@@ -73,13 +76,13 @@ const ProductDetailPage = () => {
     }
 
     loadReviews()
-  }, [id, page])
+  }, [id, reviewPage])
 
   const handleAddToCart = async () => {
     if (!product) return
     
     if (!isLoggedIn) {
-      setIsAuthModalOpen(true)
+      setIsLoginConfirmModalOpen(true)
       return
     }
 
@@ -90,7 +93,7 @@ const ProductDetailPage = () => {
       console.error('장바구니 추가 실패:', error)
       if (error instanceof Error) {
         if (error.message.includes('로그인')) {
-          setIsAuthModalOpen(true)
+          setIsLoginConfirmModalOpen(true)
         } else {
           alert(error.message)
         }
@@ -104,11 +107,19 @@ const ProductDetailPage = () => {
   const lastReviewElementRef = useCallback((node: HTMLDivElement | null) => {
     if (isLoadingReviews) return
     if (observerRef.current) observerRef.current.disconnect()
-    observerRef.current = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && hasMore && !isLoadingReviews) {
-        setPage((prev) => prev + 1)
+    
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingReviews) {
+          setReviewPage((prev) => prev + 1)
+        }
+      },
+      {
+        rootMargin: '100px',
+        threshold: 0.1
       }
-    })
+    )
+    
     if (node) observerRef.current.observe(node)
   }, [isLoadingReviews, hasMore])
 
@@ -140,9 +151,9 @@ const ProductDetailPage = () => {
           <div className="product-info">
             <h1 className="product-title">{product.name}</h1>
             <div className="product-rating">
-              {'★'.repeat(Math.floor(product.averageRating || 0))} 
+              {'★'.repeat(Math.floor(Number(product.averageRating ?? 0)))}
               <span className="rating-text">
-                {product.averageRating?.toFixed(1) || 0} ({product.reviewCount || 0}개 리뷰)
+                {Number(product.averageRating ?? 0).toFixed(1)} ({Number(product.reviewCount ?? 0)}개 리뷰)
               </span>
             </div>
             <div className="product-price-large">
@@ -166,10 +177,25 @@ const ProductDetailPage = () => {
         </div>
 
         <div className="reviews-section">
-          <h2 className="section-title">리뷰 ({product.reviewCount || 0})</h2>
-          
+          <div className="reviews-section-header">
+            <h2 className="section-title">리뷰 ({Number(product.reviewCount ?? 0)})</h2>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                if (!isLoggedIn) setIsLoginConfirmModalOpen(true)
+                else if (id) navigate(`/products/${id}/write-review`)
+              }}
+            >
+              리뷰 쓰기
+            </Button>
+          </div>
           <div className="reviews-list">
-            {reviews.map((review, index) => (
+            {!isLoadingReviews && reviews.length === 0 && (
+              <p className="reviews-empty-message">아직 작성된 리뷰가 없습니다.</p>
+            )}
+            {reviews.map((review, index) => {
+              const isMine = isLoggedIn && user?.id && String(review.userId) === user.id
+              return (
               <div
                 key={review.id}
                 className="review-item"
@@ -179,7 +205,8 @@ const ProductDetailPage = () => {
                   <div className="review-user">
                     <strong>{review.userName}</strong>
                     <div className="review-rating">
-                      {'⭐'.repeat(review.rating)}
+                      {'★'.repeat(review.rating)}
+                      <span className="review-rating-num">{review.rating}점</span>
                     </div>
                   </div>
                   <div className="review-date">
@@ -194,14 +221,30 @@ const ProductDetailPage = () => {
                     ))}
                   </div>
                 )}
-                {review.isMine && (
+                {isMine && (
                   <div className="review-actions">
-                    <button>수정</button>
-                    <button>삭제</button>
+                    <button type="button" onClick={() => navigate(`/my-reviews/edit/${review.id}`)}>
+                      수정
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!window.confirm('이 리뷰를 삭제하시겠습니까?')) return
+                        try {
+                          const { deleteReview } = await import('../utils/api')
+                          await deleteReview(review.id)
+                          setReviews((prev) => prev.filter((r) => r.id !== review.id))
+                        } catch (err) {
+                          alert(err instanceof Error ? err.message : '삭제에 실패했습니다.')
+                        }
+                      }}
+                    >
+                      삭제
+                    </button>
                   </div>
                 )}
               </div>
-            ))}
+            )})}
             {hasMore && (
               <div className="load-more-container">
                 <LoadingSpinner />
@@ -216,6 +259,21 @@ const ProductDetailPage = () => {
         </div>
       </div>
       <CartButton />
+      {/* 로그인 확인 모달 */}
+      <ConfirmModal
+        isOpen={isLoginConfirmModalOpen && !isAuthModalOpen}
+        message="로그인이 필요한 서비스입니다. 로그인을 하시겠습니까?"
+        confirmText="로그인"
+        cancelText="취소"
+        onConfirm={() => {
+          setIsLoginConfirmModalOpen(false)
+          setIsAuthModalOpen(true)
+        }}
+        onCancel={() => {
+          setIsLoginConfirmModalOpen(false)
+        }}
+      />
+
       <AuthModal 
         isOpen={isAuthModalOpen} 
         onClose={() => setIsAuthModalOpen(false)} 

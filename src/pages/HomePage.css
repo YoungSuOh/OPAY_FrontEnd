@@ -115,7 +115,7 @@
   transform: translateY(-2px);
 }
 
-.product-badge {
+.home-page .product-badge {
   position: absolute;
   top: 0.5rem;
   left: 0.5rem;

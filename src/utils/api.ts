@@ -1,6 +1,17 @@
-import { OrderInfo, PaymentResult, PaymentMethod, CartItem, Product, Review, ReviewFormData, DeliveryStatus } from '../types'
+import { OrderInfo, PaymentResult, PaymentMethod, CartItem, Product, Review, DeliveryStatus, UserInfo, ShippingAddress, Transaction, WalletInfo } from '../types'
+import { useAuthStore } from '../store/authStore'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
+
+// 세션 만료 시 콜백 (앱에서 설정 가능)
+let onSessionExpired: () => void = () => {
+  useAuthStore.getState().clearAuth()
+  sessionStorage.setItem('showLogoutToast', 'true')
+  window.location.href = '/'
+}
+export const setOnSessionExpired = (fn: () => void): void => {
+  onSessionExpired = fn
+}
 
 // Access Token을 가져오는 헬퍼 함수
 const getAccessToken = (): string | null => {
@@ -19,6 +30,61 @@ const getAuthHeaders = (): HeadersInit => {
   }
   
   return headers
+}
+
+// 리프레시 진행 시 동시 요청이 하나의 리프레시만 하도록
+let refreshPromise: Promise<AuthResponse | null> | null = null
+
+/**
+ * 401/403 시 리프레시 1회 시도 후 재요청, 실패 시 세션 만료 처리 후 throw
+ */
+async function authFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit & { _retry?: boolean }
+): Promise<Response> {
+  const { _retry, ...fetchInit } = init ?? {}
+  const headers = { ...getAuthHeaders(), ...(fetchInit.headers as Record<string, string>) }
+  const res = await fetch(input, { ...fetchInit, headers })
+  if (res.status !== 401 && res.status !== 403) return res
+  if (_retry) {
+    onSessionExpired()
+    throw new Error('세션이 만료되었습니다. 다시 로그인해 주세요.')
+  }
+  try {
+    if (!refreshPromise) {
+      refreshPromise = (async () => {
+        try {
+          const auth = await refreshAccessTokenInternal()
+          return auth
+        } catch {
+          return null
+        } finally {
+          refreshPromise = null
+        }
+      })()
+    }
+    const auth = await refreshPromise
+    if (!auth) {
+      onSessionExpired()
+      throw new Error('세션이 만료되었습니다. 다시 로그인해 주세요.')
+    }
+    useAuthStore.getState().setAuth(auth)
+    return authFetch(input, { ...fetchInit, _retry: true })
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('세션이 만료')) throw e
+    onSessionExpired()
+    throw new Error('세션이 만료되었습니다. 다시 로그인해 주세요.')
+  }
+}
+
+// 리프레시 API (authFetch 사용하지 않음, 쿠키만 사용)
+async function refreshAccessTokenInternal(): Promise<AuthResponse> {
+  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  if (!response.ok) throw new Error('토큰 갱신에 실패했습니다.')
+  return response.json()
 }
 
 // 인증 관련 API
@@ -94,18 +160,24 @@ export const logout = async (): Promise<void> => {
   localStorage.removeItem('accessToken')
 }
 
-// Access Token 갱신
-export const refreshAccessToken = async (): Promise<AuthResponse> => {
-  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-    method: 'POST',
-    credentials: 'include', // 쿠키 포함
+// 현재 사용자 정보 조회
+export const getUserInfo = async (): Promise<UserInfo> => {
+  const response = await authFetch(`${API_BASE_URL}/auth/me`, {
+    method: 'GET',
+    credentials: 'include',
   })
 
   if (!response.ok) {
-    throw new Error('토큰 갱신에 실패했습니다.')
+    const error = await response.json().catch(() => ({ message: '사용자 정보 조회에 실패했습니다.' }))
+    throw new Error(error.message || '사용자 정보 조회에 실패했습니다.')
   }
 
   return response.json()
+}
+
+// Access Token 갱신 (만료 전 주기 갱신용, 403 시 자동 재시도는 authFetch에서 처리)
+export const refreshAccessToken = async (): Promise<AuthResponse> => {
+  return refreshAccessTokenInternal()
 }
 
 // 이메일 중복확인
@@ -140,35 +212,62 @@ export const generateIdempotencyKey = (): string => {
 }
 
 // 주문 정보 생성 및 서버 검증
-export const createOrder = async (items: Array<{ productId: string; quantity: number }>): Promise<OrderInfo> => {
-  const response = await fetch(`${API_BASE_URL}/orders`, {
+// clearCart: false면 주문 확인 페이지 진입 시 장바구니 유지, 결제 완료 후 별도 비우기
+export const createOrder = async (
+  items: Array<{ productId: string | number; quantity: number }>,
+  options?: { clearCart?: boolean }
+): Promise<OrderInfo> => {
+  const clearCart = options?.clearCart ?? false
+  const bodyItems = items.map((item) => ({
+    productId: Number(item.productId),
+    quantity: item.quantity,
+  }))
+  const url = `${API_BASE_URL}/orders?clearCart=${clearCart}`
+  const response = await authFetch(url, {
     method: 'POST',
-    headers: getAuthHeaders(),
     credentials: 'include',
-    body: JSON.stringify({ items }),
+    body: JSON.stringify({ items: bodyItems }),
   })
 
   if (!response.ok) {
     throw new Error('주문 생성에 실패했습니다.')
   }
 
-  return response.json()
+  const data = await response.json()
+  // 백엔드 응답(id, items: { productName, price })를 OrderInfo 형태로 정규화
+  return {
+    orderId: String(data.id ?? data.orderId),
+    totalAmount: data.totalAmount ?? 0,
+    paymentMethod: 'CARD' as PaymentMethod,
+    createdAt: data.createdAt ?? new Date().toISOString(),
+    items: (data.items ?? []).map((item: { productId?: number; productName?: string; product?: { name?: string; imageUrl?: string; price?: number }; productImageUrl?: string; quantity: number; price?: number }) => ({
+      product: {
+        id: String(item.productId ?? ''),
+        name: item.productName ?? item.product?.name ?? '',
+        price: Number(item.price ?? item.product?.price ?? 0),
+        description: '',
+        stock: 0,
+        imageUrl: item.productImageUrl ?? item.product?.imageUrl ?? '',
+      },
+      quantity: item.quantity,
+    })),
+  }
 }
 
-// PaymentId 발급 요청
+// PaymentId 발급 요청 (백엔드: orderId, amount, method, idempotencyKey)
 export const requestPaymentId = async (
   orderId: string,
+  amount: number,
   paymentMethod: PaymentMethod,
   idempotencyKey: string
 ): Promise<{ paymentId: string }> => {
-  const response = await fetch(`${API_BASE_URL}/payments/request`, {
+  const response = await authFetch(`${API_BASE_URL}/payments/request`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    credentials: 'include',
     body: JSON.stringify({
-      orderId,
-      paymentMethod,
+      orderId: Number(orderId),
+      amount: Number(amount),
+      method: paymentMethod,
       idempotencyKey,
     }),
   })
@@ -185,11 +284,9 @@ export const approvePayment = async (
   paymentId: string,
   idempotencyKey: string
 ): Promise<PaymentResult> => {
-  const response = await fetch(`${API_BASE_URL}/payments/approve`, {
+  const response = await authFetch(`${API_BASE_URL}/payments/approve`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    credentials: 'include',
     body: JSON.stringify({
       paymentId,
       idempotencyKey,
@@ -205,7 +302,9 @@ export const approvePayment = async (
 
 // 결제 상태 조회
 export const checkPaymentStatus = async (paymentId: string): Promise<PaymentResult> => {
-  const response = await fetch(`${API_BASE_URL}/payments/${paymentId}/status`)
+  const response = await authFetch(`${API_BASE_URL}/payments/${paymentId}/status`, {
+    credentials: 'include',
+  })
 
   if (!response.ok) {
     throw new Error('결제 상태 조회에 실패했습니다.')
@@ -216,7 +315,9 @@ export const checkPaymentStatus = async (paymentId: string): Promise<PaymentResu
 
 // 주문 내역 조회
 export const getOrderHistory = async (orderId: string): Promise<OrderInfo & { paymentResult: PaymentResult }> => {
-  const response = await fetch(`${API_BASE_URL}/orders/${orderId}`)
+  const response = await authFetch(`${API_BASE_URL}/orders/${orderId}`, {
+    credentials: 'include',
+  })
 
   if (!response.ok) {
     throw new Error('주문 내역 조회에 실패했습니다.')
@@ -253,19 +354,9 @@ export const addToCart = async (productId: string, quantity: number = 1): Promis
     productId: Number(productId),
     quantity,
   }
-  const headers = getAuthHeaders()
-  
-  console.log('장바구니 추가 요청:', {
-    url,
-    method: 'POST',
-    headers,
-    body: requestBody,
-  })
-
   try {
-    const response = await fetch(url, {
+    const response = await authFetch(url, {
       method: 'POST',
-      headers,
       credentials: 'include',
       body: JSON.stringify(requestBody),
     })
@@ -297,18 +388,9 @@ export const addToCart = async (productId: string, quantity: number = 1): Promis
 // 장바구니 목록 조회
 export const getCartItems = async (): Promise<CartListResponse> => {
   const url = `${API_BASE_URL}/carts`
-  const headers = getAuthHeaders()
-  
-  console.log('장바구니 조회 요청:', {
-    url,
-    method: 'GET',
-    headers,
-  })
-
   try {
-    const response = await fetch(url, {
+    const response = await authFetch(url, {
       method: 'GET',
-      headers,
       credentials: 'include',
     })
 
@@ -338,9 +420,8 @@ export const getCartItems = async (): Promise<CartListResponse> => {
 
 // 장바구니 수량 수정
 export const updateCartQuantity = async (cartId: number, quantity: number): Promise<CartResponse> => {
-  const response = await fetch(`${API_BASE_URL}/carts/${cartId}/quantity?quantity=${quantity}`, {
+  const response = await authFetch(`${API_BASE_URL}/carts/${cartId}/quantity?quantity=${quantity}`, {
     method: 'PATCH',
-    headers: getAuthHeaders(),
     credentials: 'include',
   })
 
@@ -354,9 +435,8 @@ export const updateCartQuantity = async (cartId: number, quantity: number): Prom
 
 // 장바구니 항목 삭제
 export const removeFromCart = async (cartId: number): Promise<void> => {
-  const response = await fetch(`${API_BASE_URL}/carts/${cartId}`, {
+  const response = await authFetch(`${API_BASE_URL}/carts/${cartId}`, {
     method: 'DELETE',
-    headers: getAuthHeaders(),
     credentials: 'include',
   })
 
@@ -368,9 +448,8 @@ export const removeFromCart = async (cartId: number): Promise<void> => {
 
 // 장바구니 전체 비우기
 export const clearCart = async (): Promise<void> => {
-  const response = await fetch(`${API_BASE_URL}/carts`, {
+  const response = await authFetch(`${API_BASE_URL}/carts`, {
     method: 'DELETE',
-    headers: getAuthHeaders(),
     credentials: 'include',
   })
 
@@ -382,9 +461,8 @@ export const clearCart = async (): Promise<void> => {
 
 // 장바구니 항목 개수 조회
 export const getCartItemCount = async (): Promise<number> => {
-  const response = await fetch(`${API_BASE_URL}/carts/count`, {
+  const response = await authFetch(`${API_BASE_URL}/carts/count`, {
     method: 'GET',
-    headers: getAuthHeaders(),
     credentials: 'include',
   })
 
@@ -505,6 +583,15 @@ export const syncRecentProductsToServer = async (productIds: string[]): Promise<
   })
 }
 
+// 리뷰 응답 정규화 (id, productId, userId를 string으로)
+const normalizeReview = (r: { id?: number; productId?: number; userId?: number; [key: string]: unknown }): Review => ({
+  ...r,
+  id: String(r.id ?? ''),
+  productId: String(r.productId ?? ''),
+  userId: String(r.userId ?? ''),
+  createdAt: (r.createdAt as string) ?? new Date().toISOString(),
+} as Review)
+
 // 리뷰 관련 API
 export const getProductReviews = async (
   productId: string,
@@ -520,68 +607,94 @@ export const getProductReviews = async (
   }
 
   const data = await response.json()
-  // 백엔드 응답 형식에 맞게 변환
   return {
-    reviews: data.reviews?.map((r: any) => ({
-      ...r,
-      id: String(r.id),
-      productId: String(r.productId),
-      userId: String(r.userId),
-    })) || [],
-    hasMore: data.hasNext || false,
+    reviews: (data.reviews ?? []).map(normalizeReview),
+    hasMore: data.hasNext ?? false,
+  }
+}
+
+/** 리뷰 단건 조회 */
+export const getReview = async (reviewId: string): Promise<Review> => {
+  const response = await fetch(`${API_BASE_URL}/reviews/${reviewId}`, {
+    credentials: 'include',
+  })
+  if (!response.ok) throw new Error('리뷰를 불러오지 못했습니다.')
+  const data = await response.json()
+  return normalizeReview(data)
+}
+
+/** 내가 쓴 리뷰 목록 (페이지네이션) */
+export const getMyReviews = async (
+  userId: string,
+  page: number = 0,
+  size: number = 10
+): Promise<{ reviews: Review[]; totalPages: number; hasNext: boolean }> => {
+  const response = await authFetch(
+    `${API_BASE_URL}/reviews/user/${userId}?page=${page}&size=${size}`,
+    { credentials: 'include' }
+  )
+
+  if (!response.ok) {
+    throw new Error('내 리뷰 목록을 불러오지 못했습니다.')
+  }
+
+  const data = await response.json()
+  return {
+    reviews: (data.reviews ?? []).map(normalizeReview),
+    totalPages: data.totalPages ?? 0,
+    hasNext: data.hasNext ?? false,
   }
 }
 
 export const createReview = async (
   productId: string,
-  reviewData: ReviewFormData
+  reviewData: { rating: number; content: string }
 ): Promise<Review> => {
-  const formData = new FormData()
-  formData.append('rating', reviewData.rating.toString())
-  formData.append('content', reviewData.content)
-  reviewData.images.forEach((image) => {
-    formData.append('images', image)
-  })
-
-  const response = await fetch(`${API_BASE_URL}/products/${productId}/reviews`, {
+  const response = await authFetch(`${API_BASE_URL}/reviews`, {
     method: 'POST',
     credentials: 'include',
-    body: formData,
+    body: JSON.stringify({
+      productId: Number(productId),
+      rating: reviewData.rating,
+      content: reviewData.content || '',
+    }),
   })
 
   if (!response.ok) {
-    throw new Error('리뷰 작성에 실패했습니다.')
+    const err = await response.json().catch(() => ({}))
+    throw new Error(err.message || '리뷰 작성에 실패했습니다.')
   }
 
-  return response.json()
+  const data = await response.json()
+  return normalizeReview(data)
 }
 
 export const updateReview = async (
   reviewId: string,
-  reviewData: ReviewFormData
+  productId: string,
+  reviewData: { rating: number; content: string }
 ): Promise<Review> => {
-  const formData = new FormData()
-  formData.append('rating', reviewData.rating.toString())
-  formData.append('content', reviewData.content)
-  reviewData.images.forEach((image) => {
-    formData.append('images', image)
-  })
-
-  const response = await fetch(`${API_BASE_URL}/reviews/${reviewId}`, {
+  const response = await authFetch(`${API_BASE_URL}/reviews/${reviewId}`, {
     method: 'PUT',
     credentials: 'include',
-    body: formData,
+    body: JSON.stringify({
+      productId: Number(productId),
+      rating: reviewData.rating,
+      content: reviewData.content || '',
+    }),
   })
 
   if (!response.ok) {
-    throw new Error('리뷰 수정에 실패했습니다.')
+    const err = await response.json().catch(() => ({}))
+    throw new Error(err.message || '리뷰 수정에 실패했습니다.')
   }
 
-  return response.json()
+  const data = await response.json()
+  return normalizeReview(data)
 }
 
 export const deleteReview = async (reviewId: string): Promise<void> => {
-  const response = await fetch(`${API_BASE_URL}/reviews/${reviewId}`, {
+  const response = await authFetch(`${API_BASE_URL}/reviews/${reviewId}`, {
     method: 'DELETE',
     credentials: 'include',
   })
@@ -645,7 +758,7 @@ export const getProducts = async (params: ProductListParams = {}): Promise<Produ
   }
 }
 
-// 상품 상세 조회
+// 상품 상세 조회 (리뷰 수·별점 API 연동, 없으면 0 기본값)
 export const getProduct = async (id: string): Promise<Product> => {
   const response = await fetch(`${API_BASE_URL}/products/${id}`, {
     credentials: 'include',
@@ -656,10 +769,13 @@ export const getProduct = async (id: string): Promise<Product> => {
   }
 
   const data = await response.json()
-  // 백엔드의 id를 string으로 변환
+  const averageRating = data.averageRating != null ? Number(data.averageRating) : 0
+  const reviewCount = data.reviewCount != null ? Number(data.reviewCount) : 0
   return {
     ...data,
     id: String(data.id),
+    averageRating,
+    reviewCount,
   }
 }
 
@@ -676,13 +792,16 @@ export const getCategories = async (): Promise<string[]> => {
   return response.json()
 }
 
-// 구매 내역 관련 API
+// 구매 내역 관련 API (page: 1-based, 백엔드는 0-based page + size 사용)
 export const getOrderList = async (page: number = 1, limit: number = 10): Promise<{
   orders: OrderInfo[]
-  hasMore: boolean
+  hasMore?: boolean
+  hasNext?: boolean
+  totalPages?: number
+  totalElements?: number
 }> => {
-  const response = await fetch(
-    `${API_BASE_URL}/orders?page=${page}&limit=${limit}`,
+  const response = await authFetch(
+    `${API_BASE_URL}/orders?page=${page - 1}&size=${limit}`,
     {
       credentials: 'include',
     }
@@ -692,6 +811,48 @@ export const getOrderList = async (page: number = 1, limit: number = 10): Promis
     throw new Error('주문 목록 조회에 실패했습니다.')
   }
 
+  const data = await response.json()
+  const rawOrders = data.orders ?? []
+  const orders = rawOrders.map((o: { id?: number; orderId?: string; [key: string]: unknown }) => ({
+    ...o,
+    orderId: o.orderId ?? String(o.id ?? ''),
+  }))
+  return {
+    orders,
+    hasMore: data.hasMore ?? data.hasNext ?? false,
+    hasNext: data.hasNext,
+    totalPages: data.totalPages,
+    totalElements: data.totalElements,
+  }
+}
+
+// 전체 주문 개수 조회
+export const getTotalOrderCount = async (): Promise<number> => {
+  const response = await authFetch(`${API_BASE_URL}/orders/count`, {
+    method: 'GET',
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: '전체 주문 개수 조회에 실패했습니다.' }))
+    throw new Error(error.message || '전체 주문 개수 조회에 실패했습니다.')
+  }
+
+  return response.json()
+}
+
+// 이달의 주문 개수 조회
+export const getMonthlyOrderCount = async (): Promise<number> => {
+  const response = await authFetch(`${API_BASE_URL}/orders/count/monthly`, {
+    method: 'GET',
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: '이달의 주문 개수 조회에 실패했습니다.' }))
+    throw new Error(error.message || '이달의 주문 개수 조회에 실패했습니다.')
+  }
+
   return response.json()
 }
 
@@ -699,7 +860,7 @@ export const getOrderDetail = async (orderId: string): Promise<OrderInfo & {
   paymentResult: PaymentResult
   deliveryTimeline: Array<{ status: DeliveryStatus; message: string; timestamp: string }>
 }> => {
-  const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
+  const response = await authFetch(`${API_BASE_URL}/orders/${orderId}`, {
     credentials: 'include',
   })
 
@@ -715,11 +876,8 @@ export const requestPGPayment = async (
   paymentId: string,
   pgProvider: 'TOSS' | 'KAKAO' | 'NAVER'
 ): Promise<{ redirectUrl: string }> => {
-  const response = await fetch(`${API_BASE_URL}/payments/pg/${pgProvider}`, {
+  const response = await authFetch(`${API_BASE_URL}/payments/pg/${pgProvider}`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     credentials: 'include',
     body: JSON.stringify({ paymentId }),
   })
@@ -729,4 +887,269 @@ export const requestPGPayment = async (
   }
 
   return response.json()
+}
+
+// 배송지 관련 API
+export const getShippingAddresses = async (): Promise<ShippingAddress[]> => {
+  const response = await authFetch(`${API_BASE_URL}/shipping-addresses`, {
+    method: 'GET',
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: '배송지 조회에 실패했습니다.' }))
+    throw new Error(error.message || '배송지 조회에 실패했습니다.')
+  }
+
+  const addresses = await response.json()
+  return addresses.map((addr: any) => ({
+    id: String(addr.id),
+    name: addr.name || null,
+    recipient: addr.recipient,
+    phone: addr.phone,
+    address: addr.address,
+    detailAddress: addr.detailAddress || null,
+    postalCode: addr.postalCode || null,
+    isDefault: addr.isDefault || false,
+    createdAt: addr.createdAt || new Date().toISOString(),
+  }))
+}
+
+export const getDefaultShippingAddress = async (): Promise<ShippingAddress | null> => {
+  const response = await authFetch(`${API_BASE_URL}/shipping-addresses/default`, {
+    method: 'GET',
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      return null
+    }
+    const error = await response.json().catch(() => ({ message: '기본 배송지 조회에 실패했습니다.' }))
+    throw new Error(error.message || '기본 배송지 조회에 실패했습니다.')
+  }
+
+  const addr = await response.json()
+  return {
+    id: String(addr.id),
+    name: addr.name || null,
+    recipient: addr.recipient,
+    phone: addr.phone,
+    address: addr.address,
+    detailAddress: addr.detailAddress || null,
+    postalCode: addr.postalCode || null,
+    isDefault: addr.isDefault || false,
+    createdAt: addr.createdAt || new Date().toISOString(),
+  }
+}
+
+// 배송지 추가
+export const addShippingAddress = async (request: {
+  name?: string | null
+  recipient: string
+  phone: string
+  address: string
+  detailAddress?: string | null
+  postalCode?: string | null
+  isDefault?: boolean
+}): Promise<ShippingAddress> => {
+  const response = await authFetch(`${API_BASE_URL}/shipping-addresses`, {
+    method: 'POST',
+    credentials: 'include',
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: '배송지 추가에 실패했습니다.' }))
+    throw new Error(error.message || '배송지 추가에 실패했습니다.')
+  }
+
+  const addr = await response.json()
+  return {
+    id: String(addr.id),
+    name: addr.name || null,
+    recipient: addr.recipient,
+    phone: addr.phone,
+    address: addr.address,
+    detailAddress: addr.detailAddress || null,
+    postalCode: addr.postalCode || null,
+    isDefault: addr.isDefault || false,
+    createdAt: addr.createdAt || new Date().toISOString(),
+  }
+}
+
+// 배송지 수정
+export const updateShippingAddress = async (
+  id: string,
+  request: {
+    name?: string | null
+    recipient: string
+    phone: string
+    address: string
+    detailAddress?: string | null
+    postalCode?: string | null
+    isDefault?: boolean
+  }
+): Promise<ShippingAddress> => {
+  const response = await authFetch(`${API_BASE_URL}/shipping-addresses/${id}`, {
+    method: 'PUT',
+    credentials: 'include',
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: '배송지 수정에 실패했습니다.' }))
+    throw new Error(error.message || '배송지 수정에 실패했습니다.')
+  }
+
+  const addr = await response.json()
+  return {
+    id: String(addr.id),
+    name: addr.name || null,
+    recipient: addr.recipient,
+    phone: addr.phone,
+    address: addr.address,
+    detailAddress: addr.detailAddress || null,
+    postalCode: addr.postalCode || null,
+    isDefault: addr.isDefault || false,
+    createdAt: addr.createdAt || new Date().toISOString(),
+  }
+}
+
+// 배송지 삭제
+export const deleteShippingAddress = async (id: string): Promise<void> => {
+  const response = await authFetch(`${API_BASE_URL}/shipping-addresses/${id}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: '배송지 삭제에 실패했습니다.' }))
+    throw new Error(error.message || '배송지 삭제에 실패했습니다.')
+  }
+}
+
+// 기본 배송지 설정
+export const setDefaultShippingAddress = async (id: string): Promise<ShippingAddress> => {
+  const response = await authFetch(`${API_BASE_URL}/shipping-addresses/${id}/default`, {
+    method: 'PATCH',
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: '기본 배송지 설정에 실패했습니다.' }))
+    throw new Error(error.message || '기본 배송지 설정에 실패했습니다.')
+  }
+
+  const addr = await response.json()
+  return {
+    id: String(addr.id),
+    name: addr.name || null,
+    recipient: addr.recipient,
+    phone: addr.phone,
+    address: addr.address,
+    detailAddress: addr.detailAddress || null,
+    postalCode: addr.postalCode || null,
+    isDefault: addr.isDefault || false,
+    createdAt: addr.createdAt || new Date().toISOString(),
+  }
+}
+
+// 지갑 관련 API
+export const getWalletBalance = async (): Promise<number> => {
+  const response = await authFetch(`${API_BASE_URL}/wallets/balance`, {
+    method: 'GET',
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: '지갑 잔액 조회에 실패했습니다.' }))
+    throw new Error(error.message || '지갑 잔액 조회에 실패했습니다.')
+  }
+
+  return response.json()
+}
+
+export const getWallet = async (): Promise<WalletInfo> => {
+  const response = await authFetch(`${API_BASE_URL}/wallets`, {
+    method: 'GET',
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: '지갑 조회에 실패했습니다.' }))
+    throw new Error(error.message || '지갑 조회에 실패했습니다.')
+  }
+
+  const wallet = await response.json()
+  return {
+    ...wallet,
+    id: wallet.id,
+    userId: wallet.userId,
+    balance: wallet.balance,
+  }
+}
+
+export const chargeWallet = async (amount: number): Promise<WalletInfo> => {
+  const response = await authFetch(`${API_BASE_URL}/wallets/charge`, {
+    method: 'POST',
+    credentials: 'include',
+    body: JSON.stringify({ amount }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: '머니 충전에 실패했습니다.' }))
+    throw new Error(error.message || '머니 충전에 실패했습니다.')
+  }
+
+  const wallet = await response.json()
+  return {
+    ...wallet,
+    id: wallet.id,
+    userId: wallet.userId,
+    balance: wallet.balance,
+  }
+}
+
+// 거래 내역 관련 API
+export const getTransactions = async (page: number = 0, size: number = 20): Promise<{
+  content: Transaction[]
+  totalElements: number
+  totalPages: number
+  currentPage: number
+  pageSize: number
+  hasNext: boolean
+  hasPrevious: boolean
+}> => {
+  const response = await authFetch(`${API_BASE_URL}/transactions?page=${page}&size=${size}`, {
+    method: 'GET',
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: '거래 내역 조회에 실패했습니다.' }))
+    throw new Error(error.message || '거래 내역 조회에 실패했습니다.')
+  }
+
+  const data = await response.json()
+  return {
+    content: (data.content || []).map((t: any) => ({
+      transactionId: t.transactionId,
+      userId: t.userId,
+      walletId: t.walletId,
+      orderId: t.orderId,
+      paymentId: t.paymentId,
+      type: t.type === 'PAY' ? 'PAYMENT' : t.type === 'EARN' ? 'POINT_EARNED' : t.type === 'REFUND' ? 'REFUND' : 'CHARGE',
+      amount: t.amount,
+      status: t.status === 'SUCCESS' ? 'COMPLETED' : t.status === 'FAIL' ? 'FAILED' : 'PENDING',
+      idempotencyKey: t.idempotencyKey,
+      createdAt: t.createdAt,
+    })),
+    totalElements: data.totalElements || 0,
+    totalPages: data.totalPages || 0,
+    currentPage: data.number || page,
+    pageSize: data.size || size,
+    hasNext: !data.last || false,
+    hasPrevious: !data.first || false,
+  }
 }

@@ -104,6 +104,17 @@
   box-shadow: 0 2px 8px rgba(2, 132, 199, 0.1);
 }
 
+.reviews-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.reviews-section-header .section-title {
+  margin-bottom: 0;
+}
+
 .section-title {
   color: var(--sky-blue-800);
   font-size: 1.5rem;
@@ -151,6 +162,12 @@
 .review-rating {
   color: #f59e0b;
   font-size: 0.9rem;
+}
+
+.review-rating-num {
+  margin-left: 0.35rem;
+  color: #64748b;
+  font-size: 0.85rem;
 }
 
 .review-date {
@@ -216,6 +233,13 @@
 
 .review-actions button:last-child:hover {
   background: #dc2626;
+}
+
+.reviews-empty-message {
+  text-align: center;
+  color: #64748b;
+  padding: 2rem;
+  margin: 0;
 }
 
 .load-more-container {

@@ -50,6 +50,26 @@ const AddressModal = ({
 
   if (!isOpen) return null
 
+  // Daum 우편번호 API (회원가입과 동일)
+  const handleSearchAddress = () => {
+    if (typeof window === 'undefined' || !(window as any).daum) {
+      alert('우편번호 서비스를 불러올 수 없습니다. 페이지를 새로고침해주세요.')
+      return
+    }
+    new (window as any).daum.Postcode({
+      oncomplete: function (data: any) {
+        const address = data.userSelectedType === 'R' ? data.roadAddress : data.jibunAddress
+        setNewAddress((prev) => ({
+          ...prev,
+          address,
+          postalCode: data.zonecode || prev.postalCode,
+        }))
+        const detailInput = document.getElementById('address-modal-detail-address') as HTMLInputElement
+        if (detailInput) detailInput.focus()
+      },
+    }).open()
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     onAddAddress(newAddress)
@@ -209,36 +229,41 @@ const AddressModal = ({
                 />
               </div>
               <div className="form-group">
-                <label>우편번호</label>
-                <div className="postal-code-group">
-                  <input
-                    type="text"
-                    value={newAddress.postalCode}
-                    onChange={(e) =>
-                      setNewAddress({ ...newAddress, postalCode: e.target.value })
-                    }
-                    placeholder="12345"
-                    required
-                  />
-                  <button type="button" className="search-postal-btn">
+                <label>주소</label>
+                <div className="address-search-container">
+                  <button
+                    type="button"
+                    className="address-search-btn"
+                    onClick={handleSearchAddress}
+                  >
                     주소 검색
                   </button>
+                  <input
+                    type="text"
+                    value={newAddress.address}
+                    onChange={(e) =>
+                      setNewAddress({ ...newAddress, address: e.target.value })
+                    }
+                    placeholder="주소 검색 버튼을 눌러 주소를 입력하세요"
+                    required
+                  />
                 </div>
               </div>
               <div className="form-group">
-                <label>주소</label>
+                <label>우편번호</label>
                 <input
                   type="text"
-                  value={newAddress.address}
+                  value={newAddress.postalCode}
                   onChange={(e) =>
-                    setNewAddress({ ...newAddress, address: e.target.value })
+                    setNewAddress({ ...newAddress, postalCode: e.target.value })
                   }
-                  required
+                  placeholder="주소 검색 시 자동 입력"
                 />
               </div>
               <div className="form-group">
                 <label>상세주소</label>
                 <input
+                  id="address-modal-detail-address"
                   type="text"
                   value={newAddress.detailAddress}
                   onChange={(e) =>

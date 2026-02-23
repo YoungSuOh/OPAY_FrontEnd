@@ -226,6 +226,34 @@
   border-color: var(--sky-blue-600);
 }
 
+/* 주소 검색 (Daum API - 회원가입과 동일) */
+.address-search-container {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.address-search-container .address-search-btn {
+  padding: 0.75rem 1rem;
+  background: var(--sky-blue-600);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+
+.address-search-container .address-search-btn:hover {
+  background: var(--sky-blue-700);
+}
+
+.address-search-container input {
+  flex: 1;
+  min-width: 0;
+}
+
 .postal-code-group {
   display: flex;
   gap: 0.5rem;
@@ -233,22 +261,6 @@
 
 .postal-code-group input {
   flex: 1;
-}
-
-.search-postal-btn {
-  background: var(--sky-blue-600);
-  color: white;
-  border: none;
-  padding: 0.75rem 1rem;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.search-postal-btn:hover {
-  background: var(--sky-blue-700);
 }
 
 .checkbox-group label {

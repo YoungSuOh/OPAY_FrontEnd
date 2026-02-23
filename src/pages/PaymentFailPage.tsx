@@ -58,21 +58,22 @@ const PaymentFailPage = () => {
     navigate('/products')
   }
 
-  // UI 확인을 위해 샘플 데이터 사용
-  const displayResult = paymentResult || {
-    paymentId: 'PAY-DEMO-12345',
-    status: 'FAIL' as const,
-    amount: 9900,
-    paymentMethod: 'CARD' as const,
-    failReason: '카드 한도 초과로 인한 결제 실패',
-    canRetry: true,
-  }
-  
-  const displayOrder = currentOrder || {
-    orderId: 'ORDER-DEMO-12345',
-    items: [],
-    totalAmount: 9900,
-    paymentMethod: 'CARD' as const,
+  if (!paymentResult) {
+    return (
+      <PageContainer>
+        <Header showSearch={false} showQButton={false} />
+        <div className="payment-fail">
+          <div className="fail-icon">✕</div>
+          <h2 className="fail-title">결제에 실패했습니다</h2>
+          <p className="fail-message">결제 정보를 불러올 수 없습니다.</p>
+          <div className="fail-actions">
+            <Button fullWidth onClick={handleCancel} variant="primary">
+              상품 목록으로
+            </Button>
+          </div>
+        </div>
+      </PageContainer>
+    )
   }
 
   return (
@@ -82,7 +83,7 @@ const PaymentFailPage = () => {
         <div className="fail-icon">✕</div>
         <h2 className="fail-title">결제에 실패했습니다</h2>
         <p className="fail-message">
-          {displayResult.failReason || '결제 처리 중 오류가 발생했습니다.'}
+          {paymentResult.failReason || '결제 처리 중 오류가 발생했습니다.'}
         </p>
 
         <div className="fail-details">
@@ -90,18 +91,20 @@ const PaymentFailPage = () => {
             <div className="detail-item">
               <span className="detail-label">결제 금액</span>
               <span className="detail-value">
-                {displayResult.amount.toLocaleString()}원
+                {paymentResult.amount.toLocaleString()}원
               </span>
             </div>
-            <div className="detail-item">
-              <span className="detail-label">주문 번호</span>
-              <span className="detail-value">{displayOrder.orderId}</span>
-            </div>
+            {currentOrder && (
+              <div className="detail-item">
+                <span className="detail-label">주문 번호</span>
+                <span className="detail-value">{currentOrder.orderId}</span>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="fail-actions">
-          {displayResult.canRetry !== false && (
+          {paymentResult.canRetry !== false && currentOrder?.paymentId && currentOrder?.idempotencyKey && (
             <Button
               fullWidth
               onClick={handleRetry}

@@ -28,11 +28,17 @@ const CartPage = () => {
   const [selectAll, setSelectAll] = useState(true)
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
+  const [isLoginConfirmModalOpen, setIsLoginConfirmModalOpen] = useState(false)
 
-  // 비로그인 상태 접근 차단
+  // 비로그인 시 장바구니 진입할 때마다 로그인 확인 모달 표시
   useEffect(() => {
+    const isLogout = sessionStorage.getItem('is_logging_out')
+    if (isLogout === 'true') {
+      sessionStorage.removeItem('is_logging_out')
+      return
+    }
     if (!isLoggedIn) {
-      setIsAuthModalOpen(true)
+      setIsLoginConfirmModalOpen(true)
     }
   }, [isLoggedIn])
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false)
@@ -195,6 +201,40 @@ const CartPage = () => {
       }))
     )
     setSelectedAddressId(addressId)
+  }
+
+  // early return은 모든 hooks 선언 이후에 위치해야 함
+  if (!isLoggedIn) {
+    return (
+      <>
+        <Header showSearch={true} showQButton={false} />
+        {isLoginConfirmModalOpen && (
+          <ConfirmModal
+            isOpen={true}
+            message="로그인이 필요한 서비스입니다. 로그인을 하시겠습니까?"
+            confirmText="로그인"
+            cancelText="취소"
+            onConfirm={() => {
+              setIsLoginConfirmModalOpen(false)
+              setIsAuthModalOpen(true)
+            }}
+            onCancel={() => {
+              setIsLoginConfirmModalOpen(false)
+              navigate('/')
+            }}
+          />
+        )}
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => {
+            setIsAuthModalOpen(false)
+            if (!isLoggedIn) {
+              navigate('/')
+            }
+          }}
+        />
+      </>
+    )
   }
 
   return (
@@ -428,6 +468,24 @@ const CartPage = () => {
       />
 
       {/* 로그인 모달 */}
+      {/* 로그인 확인 모달 */}
+      {isLoginConfirmModalOpen && (
+        <ConfirmModal
+          isOpen={true}
+          message="로그인이 필요한 서비스입니다. 로그인을 하시겠습니까?"
+          confirmText="로그인"
+          cancelText="취소"
+          onConfirm={() => {
+            setIsLoginConfirmModalOpen(false)
+            setIsAuthModalOpen(true)
+          }}
+          onCancel={() => {
+            setIsLoginConfirmModalOpen(false)
+            navigate('/')
+          }}
+        />
+      )}
+
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => {

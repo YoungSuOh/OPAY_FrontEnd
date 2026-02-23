@@ -1,3 +1,21 @@
+/* HomePage와 동일한 페이지 래퍼 */
+.order-review-page {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.order-review-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.order-review-loading-text {
+  text-align: center;
+  margin-top: 1rem;
+  color: #64748b;
+}
+
 .order-review {
   display: flex;
   flex-direction: column;
@@ -7,15 +25,15 @@
 .order-section {
   background: white;
   border-radius: 12px;
-  padding: 1.5rem;
+  padding: 2rem;
   box-shadow: 0 2px 8px rgba(2, 132, 199, 0.1);
 }
 
 .section-title {
   color: var(--sky-blue-800);
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 1rem 0;
 }
 
 .order-id {
@@ -37,14 +55,47 @@
 
 .order-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 0.75rem;
-  background: var(--sky-blue-50);
+  gap: 1rem;
+  padding: 1rem;
+  background: white;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.order-item:hover {
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15);
+  transform: translateY(-2px);
+}
+
+.order-item-image {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--sky-blue-200) 0%, var(--sky-blue-300) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.order-item-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.order-item-image-placeholder {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--sky-blue-600);
 }
 
 .item-info {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -61,6 +112,7 @@
 }
 
 .item-price {
+  flex-shrink: 0;
   font-weight: 700;
   color: var(--sky-blue-600);
   font-size: 1.1rem;
@@ -76,15 +128,17 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem;
-  background: var(--sky-blue-50);
+  padding: 1rem;
+  background: white;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .payment-method-option:hover {
-  background: var(--sky-blue-100);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15);
+  transform: translateY(-2px);
 }
 
 .payment-method-option input[type="radio"] {
@@ -99,13 +153,15 @@
   color: var(--sky-blue-800);
 }
 
+/* 총 결제 금액: 버튼과 구분되도록 연한 배경 + 테두리 */
 .total-section {
-  background: linear-gradient(135deg, var(--sky-blue-500) 0%, var(--sky-blue-600) 100%);
-  color: white;
+  background: var(--sky-blue-50);
+  border: 2px solid var(--sky-blue-200);
+  color: var(--sky-blue-900);
 }
 
 .total-section .section-title {
-  color: white;
+  color: var(--sky-blue-800);
 }
 
 .total-amount {
@@ -116,10 +172,132 @@
 
 .total-label {
   font-size: 1.1rem;
-  font-weight: 500;
+  font-weight: 600;
+  color: var(--sky-blue-800);
 }
 
 .total-value {
   font-size: 1.75rem;
   font-weight: 700;
+  color: var(--sky-blue-700);
+}
+
+/* 페이지 제목 (Header 아래) - 가운데 정렬 */
+.order-review-page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--sky-blue-800);
+  margin: 0 0 1.5rem 0;
+  padding: 0;
+  text-align: center;
+}
+
+/* 보유 잔액 섹션 */
+.balance-section .balance-cards {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.balance-card {
+  flex: 1;
+  min-width: 140px;
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  transition: all 0.2s;
+}
+
+.balance-card:hover {
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15);
+  transform: translateY(-2px);
+}
+
+.balance-label {
+  font-size: 0.9rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.balance-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--sky-blue-700);
+}
+
+/* 결제 수단 힌트 */
+.payment-hint {
+  font-size: 0.9rem;
+  color: #64748b;
+  margin-bottom: 0.75rem;
+}
+
+.payment-methods-opay {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.payment-method-checkbox input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: var(--sky-blue-600);
+}
+
+.payment-amount-hint {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-left: 0.25rem;
+}
+
+.payment-required-hint {
+  font-size: 0.875rem;
+  color: var(--sky-blue-600);
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+
+/* 장바구니 비어 있음 / 주문 로드 실패 */
+.order-review-empty .empty-message-section,
+.order-review-error .error-message-section {
+  text-align: center;
+  padding: 2rem;
+}
+
+.empty-message,
+.error-message-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--sky-blue-800);
+  margin: 0 0 0.5rem 0;
+}
+
+.empty-message-sub,
+.error-message-detail {
+  font-size: 0.95rem;
+  color: #64748b;
+  margin: 0 0 1.5rem 0;
+}
+
+.empty-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* 반응형 - HomePage와 동일 */
+@media (max-width: 768px) {
+  .order-review-content {
+    padding: 1rem;
+  }
+
+  .order-section {
+    padding: 1rem;
+  }
 }

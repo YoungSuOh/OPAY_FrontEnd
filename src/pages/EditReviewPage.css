@@ -1,0 +1,212 @@
+/* 주문내역/내 리뷰 페이지와 동일한 페이지 래퍼 */
+.edit-review-page {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.edit-review-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.edit-review-page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--sky-blue-800);
+  margin: 0 0 1.5rem 0;
+  padding: 0;
+  text-align: center;
+}
+
+.edit-review-loading-text {
+  text-align: center;
+  margin-top: 1rem;
+  color: #64748b;
+}
+
+.edit-review-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* 섹션 카드 (주문내역 order-section과 동일) */
+.edit-review-section {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.1);
+}
+
+.section-title {
+  color: var(--sky-blue-800);
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 1rem 0;
+}
+
+/* 에러 섹션 */
+.edit-review-error-section {
+  text-align: center;
+  padding: 2rem;
+}
+
+.error-message {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #dc2626;
+  margin: 0 0 1rem 0;
+}
+
+/* 상품 정보 (주문내역 order-item 스타일과 유사) */
+.edit-review-product {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.edit-review-product-image {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--sky-blue-200) 0%, var(--sky-blue-300) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.edit-review-product-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.edit-review-product-placeholder {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--sky-blue-600);
+}
+
+.edit-review-product-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.edit-review-product-name {
+  font-weight: 600;
+  color: var(--sky-blue-800);
+}
+
+.edit-review-product-price {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--sky-blue-600);
+}
+
+/* 폼 */
+.edit-review-form .form-group {
+  margin-bottom: 1.5rem;
+}
+
+.edit-review-form .form-group label {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--sky-blue-800);
+  margin-bottom: 0.5rem;
+}
+
+.rating-stars {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.rating-star {
+  padding: 0.25rem;
+  font-size: 2rem;
+  color: #e2e8f0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s;
+  line-height: 1;
+}
+
+.rating-star.active {
+  color: #fbbf24;
+}
+
+.rating-star:hover {
+  color: #fcd34d;
+}
+
+.rating-text {
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.edit-review-textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 1rem;
+  line-height: 1.5;
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.edit-review-textarea:focus {
+  outline: none;
+  border-color: var(--sky-blue-600);
+}
+
+.char-count {
+  display: block;
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-top: 0.25rem;
+  text-align: right;
+}
+
+.edit-review-error {
+  color: #dc2626;
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+}
+
+/* 액션 버튼 (주문내역 order-history-actions와 동일) */
+.edit-review-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.edit-review-actions .btn-full-width {
+  flex: 1;
+  min-width: 140px;
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .edit-review-content {
+    padding: 1rem;
+  }
+
+  .edit-review-section {
+    padding: 1rem;
+  }
+}

@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { refreshAccessToken } from '../utils/api'
+import { debounce } from '../utils/debounce'
 import AuthModal from './AuthModal'
+import Toast from './Toast'
 import './Header.css'
 
 interface HeaderProps {
@@ -10,18 +12,47 @@ interface HeaderProps {
   searchQuery?: string
   onSearchChange?: (query: string) => void
   showQButton?: boolean
+  onLogoutSuccess?: () => void
 }
 
 const Header = ({ 
   showSearch = true, 
   searchQuery: externalSearchQuery,
   onSearchChange,
-  showQButton = false 
+  showQButton = false,
+  onLogoutSuccess
 }: HeaderProps) => {
   const navigate = useNavigate()
+  const location = useLocation()
   const { isLoggedIn, setAuth, accessToken } = useAuthStore()
   const [internalSearchQuery, setInternalSearchQuery] = useState('')
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+  const [showLogoutToast, setShowLogoutToast] = useState(false)
+
+  // 페이지 로드 시 및 경로 변경 시 로그아웃 토스트 확인
+  useEffect(() => {
+    const shouldShowLogoutToast = sessionStorage.getItem('showLogoutToast')
+    if (shouldShowLogoutToast === 'true') {
+      // 플래그 즉시 제거
+      sessionStorage.removeItem('showLogoutToast')
+      
+      // 현재 경로가 '/'이면 즉시 토스트 표시
+      if (location.pathname === '/') {
+        setShowLogoutToast(true)
+        setTimeout(() => {
+          setShowLogoutToast(false)
+        }, 2000)
+      } else {
+        // 다른 페이지에서는 리다이렉트 완료 후 토스트 표시
+        setTimeout(() => {
+          setShowLogoutToast(true)
+          setTimeout(() => {
+            setShowLogoutToast(false)
+          }, 2000)
+        }, 100)
+      }
+    }
+  }, [location.pathname]) // location.pathname을 dependency에 추가
 
   // Access Token 자동 갱신 (만료 전)
   useEffect(() => {
@@ -50,9 +81,9 @@ const Header = ({
     setSearchQuery(e.target.value)
   }
 
-  const handleClearSearch = () => {
+  const handleClearSearch = useCallback(() => {
     setSearchQuery('')
-  }
+  }, [setSearchQuery])
 
   return (
     <>
@@ -107,6 +138,37 @@ const Header = ({
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
+        onLogoutSuccess={() => {
+          setIsAuthModalOpen(false)
+          // 로그아웃 플래그 설정 (ConfirmModal이 나타나지 않도록)
+          sessionStorage.setItem('is_logging_out', 'true')
+          
+          // 현재 경로에 따라 다르게 처리
+          if (location.pathname === '/') {
+            // HomePage에서 로그아웃: 토스트 즉시 표시
+            setShowLogoutToast(true)
+            setTimeout(() => {
+              setShowLogoutToast(false)
+            }, 2000)
+          } else {
+            // 다른 페이지에서 로그아웃: 플래그 저장 후 리다이렉트
+            sessionStorage.setItem('showLogoutToast', 'true')
+            // 토스트를 먼저 보여주기 위해 약간의 지연 후 리다이렉트
+            setTimeout(() => {
+              navigate('/')
+            }, 300) // 300ms 지연으로 토스트가 보이도록
+          }
+          
+          // 외부 콜백도 호출 (필요한 경우)
+          if (onLogoutSuccess) {
+            onLogoutSuccess()
+          }
+        }}
+      />
+      <Toast
+        message="로그아웃되었습니다"
+        isVisible={showLogoutToast}
+        onClose={() => setShowLogoutToast(false)}
       />
     </>
   )

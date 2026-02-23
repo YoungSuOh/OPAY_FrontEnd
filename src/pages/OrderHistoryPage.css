@@ -1,3 +1,30 @@
+/* OrderReviewPage와 동일한 페이지 래퍼 */
+.order-history-page {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.order-history-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.order-history-page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--sky-blue-800);
+  margin: 0 0 1.5rem 0;
+  padding: 0;
+  text-align: center;
+}
+
+.order-review-loading-text {
+  text-align: center;
+  margin-top: 1rem;
+  color: #64748b;
+}
+
 .order-history {
   display: flex;
   flex-direction: column;
@@ -7,15 +34,15 @@
 .order-section {
   background: white;
   border-radius: 12px;
-  padding: 1.5rem;
+  padding: 2rem;
   box-shadow: 0 2px 8px rgba(2, 132, 199, 0.1);
 }
 
 .section-title {
   color: var(--sky-blue-800);
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 1rem 0;
 }
 
 .order-id {
@@ -37,14 +64,47 @@
 
 .order-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 0.75rem;
-  background: var(--sky-blue-50);
+  gap: 1rem;
+  padding: 1rem;
+  background: white;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.order-item:hover {
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15);
+  transform: translateY(-2px);
+}
+
+.order-item-image {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--sky-blue-200) 0%, var(--sky-blue-300) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.order-item-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.order-item-image-placeholder {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--sky-blue-600);
 }
 
 .item-info {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -61,18 +121,49 @@
 }
 
 .item-price {
+  flex-shrink: 0;
   font-weight: 700;
   color: var(--sky-blue-600);
   font-size: 1.1rem;
 }
 
+/* 총 결제 금액 섹션 */
+.total-section {
+  background: var(--sky-blue-50);
+  border: 2px solid var(--sky-blue-200);
+  color: var(--sky-blue-900);
+}
+
+.total-section .section-title {
+  color: var(--sky-blue-800);
+}
+
+.total-amount {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.total-label {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--sky-blue-800);
+}
+
+.total-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--sky-blue-700);
+}
+
+/* 결제 정보 */
 .payment-status {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 0;
-  margin-bottom: 1rem;
-  border-bottom: 2px solid var(--sky-blue-200);
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .status-label {
@@ -110,6 +201,11 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.detail-item:last-child {
+  border-bottom: none;
 }
 
 .detail-label {
@@ -125,21 +221,7 @@
   text-align: right;
 }
 
-.order-history-error {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1.5rem;
-  padding: 2rem;
-}
-
-.error-message {
-  color: #dc2626;
-  font-size: 1.1rem;
-  font-weight: 600;
-  text-align: center;
-}
-
+/* 배송 타임라인 */
 .delivery-timeline {
   display: flex;
   flex-direction: column;
@@ -148,9 +230,15 @@
 
 .timeline-item {
   padding: 1rem;
-  background: var(--sky-blue-50);
+  background: white;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   border-left: 4px solid var(--sky-blue-600);
+  transition: all 0.2s;
+}
+
+.timeline-item:hover {
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15);
 }
 
 .timeline-status {
@@ -167,4 +255,201 @@
 .timeline-date {
   font-size: 0.85rem;
   color: #94a3b8;
+}
+
+/* 목록 카드 */
+.order-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.order-history-card {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.order-history-card:hover {
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15);
+  transform: translateY(-2px);
+}
+
+.order-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.order-date {
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.order-card-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.order-card-item-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.order-card-item-preview .order-item-image {
+  width: 48px;
+  height: 48px;
+}
+
+.order-card-item-preview .order-item-image-placeholder {
+  font-size: 1.1rem;
+}
+
+.order-card-item-name {
+  font-size: 0.9rem;
+  color: var(--sky-blue-800);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-card-item-qty {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.order-card-more {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.order-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.order-card-total {
+  font-weight: 700;
+  color: var(--sky-blue-700);
+  font-size: 1.05rem;
+}
+
+.order-card-link {
+  font-size: 0.9rem;
+  color: var(--sky-blue-600);
+  font-weight: 500;
+}
+
+/* 빈 상태 / 에러 */
+.order-history-empty-section,
+.order-history-error-section {
+  text-align: center;
+  padding: 2rem;
+}
+
+.empty-message,
+.error-message {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--sky-blue-800);
+  margin: 0 0 1rem 0;
+}
+
+.error-message {
+  color: #dc2626;
+}
+
+.empty-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.order-history-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.order-history-actions .btn-full-width {
+  flex: 1;
+  min-width: 140px;
+}
+
+.order-history-paging-loading {
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.order-history-paging {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding: 1rem 0;
+  flex-wrap: wrap;
+}
+
+.order-history-page-numbers {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.order-history-page-num {
+  min-width: 2.25rem;
+  height: 2.25rem;
+  padding: 0 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--sky-blue-700);
+  background: white;
+  border: 1px solid var(--sky-blue-200);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.order-history-page-num:hover:not(:disabled) {
+  background: var(--sky-blue-50);
+  border-color: var(--sky-blue-400);
+}
+
+.order-history-page-num.active {
+  background: var(--sky-blue-600);
+  color: white;
+  border-color: var(--sky-blue-600);
+}
+
+.order-history-page-num:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .order-history-content {
+    padding: 1rem;
+  }
+
+  .order-section {
+    padding: 1rem;
+  }
+
+  .order-card-item-name {
+    max-width: 80px;
+  }
 }
