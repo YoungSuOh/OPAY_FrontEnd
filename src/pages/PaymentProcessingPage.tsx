@@ -1,6 +1,20 @@
+/**
+ * 결제 처리 중 페이지 (Payment Processing)
+ *
+ * 용도:
+ * - 주문 확인 → "결제하기" 클릭 후, 결제 승인 API(approvePayment)를 호출하는 동안
+ *   사용자에게 "결제 처리 중" 로딩 화면을 보여주기 위함.
+ * - 잔액 부족 등 사전 검증은 주문 확인(OrderReview) 단계에서 처리하고,
+ *   이 페이지는 "실제 결제 승인 요청이 서버에 전달된 뒤, 결과를 기다리는 구간"으로만 사용하는 것이 좋음.
+ *
+ * 확장 제안:
+ * - PG(토스/카카오/네이버) 리다이렉트 결제 시, PG사에서 돌아온 후 "결제 완료 처리 중" 대기 화면으로 활용.
+ * - 비동기 결제(카드사 처리 지연 등) 시 "결제 상태 확인 중" 안내 후 /payment-status-check 로 이어지도록 활용.
+ */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePaymentStore } from '../store/paymentStore'
+import { useCartStore } from '../store/cartStore'
 import { approvePayment } from '../utils/api'
 import { useBlockBackNavigation, useBlockRefresh } from '../utils/blockNavigation'
 import PageContainer from '../components/PageContainer'
@@ -11,6 +25,7 @@ import './PaymentProcessingPage.css'
 const PaymentProcessingPage = () => {
   const navigate = useNavigate()
   const { currentOrder, setPaymentResult, setProcessing } = usePaymentStore()
+  const { clearCart, loadCartItems } = useCartStore()
   const [error, setError] = useState<string | null>(null)
 
   // 뒤로가기 및 새로고침 방지
@@ -18,15 +33,14 @@ const PaymentProcessingPage = () => {
   useBlockRefresh(true)
 
   useEffect(() => {
-    // UI 확인을 위해 샘플 데이터 사용
     if (!currentOrder || !currentOrder.paymentId || !currentOrder.idempotencyKey) {
-      // 샘플 데이터로 currentOrder 설정 (API 호출은 하지 않음)
+      setProcessing(false)
+      navigate('/order-review', { replace: true })
       return
     }
 
     const processPayment = async () => {
       try {
-        // 결제 승인 API 호출
         const result = await approvePayment(
           currentOrder.paymentId!,
           currentOrder.idempotencyKey!
@@ -35,8 +49,17 @@ const PaymentProcessingPage = () => {
         setPaymentResult(result)
         setProcessing(false)
 
-        // 결과에 따라 페이지 이동
         if (result.status === 'SUCCESS') {
+          try {
+            await clearCart()
+          } catch (err) {
+            console.error('결제 후 장바구니 비우기 실패:', err)
+          }
+          try {
+            await loadCartItems()
+          } catch {
+            // no-op
+          }
           navigate('/payment-success')
         } else if (result.status === 'FAIL') {
           navigate('/payment-fail')
@@ -45,10 +68,8 @@ const PaymentProcessingPage = () => {
         }
       } catch (err) {
         console.error('결제 처리 실패:', err)
-        setError('결제 처리 중 오류가 발생했습니다. (UI 확인 모드)')
-        
-        // 오류 발생 시에도 상태 확인 페이지로 이동하지 않고 그대로 표시
-        // navigate('/payment-status-check')
+        setError('결제 처리 중 오류가 발생했습니다.')
+        setProcessing(false)
       }
     }
 
@@ -58,11 +79,16 @@ const PaymentProcessingPage = () => {
   if (error) {
     return (
       <PageContainer>
+        <Header showSearch={false} showQButton={false} />
         <div className="payment-processing">
           <div className="error-message">{error}</div>
-          <div className="status-message">
-            결제 상태를 확인하는 페이지로 이동합니다...
-          </div>
+          <button
+            type="button"
+            className="payment-processing-back-btn"
+            onClick={() => navigate('/order-review')}
+          >
+            주문 확인으로 돌아가기
+          </button>
         </div>
       </PageContainer>
     )

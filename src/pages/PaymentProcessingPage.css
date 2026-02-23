@@ -43,7 +43,19 @@
   margin-bottom: 1rem;
 }
 
-.status-message {
-  color: #64748b;
+.payment-processing-back-btn {
+  margin-top: 1.5rem;
+  padding: 12px 24px;
   font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  background: var(--sky-blue-600);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.payment-processing-back-btn:hover {
+  background: var(--sky-blue-700);
 }

@@ -103,12 +103,52 @@ export interface User {
 // 배송지 관련
 export interface ShippingAddress {
   id: string
-  name: string
+  name?: string | null
   recipient: string
   phone: string
   address: string
-  detailAddress: string
-  postalCode: string
+  detailAddress?: string | null
+  postalCode?: string | null
   isDefault: boolean
   createdAt: string
+}
+
+export interface ShippingAddressRequest {
+  name?: string | null
+  recipient: string
+  phone: string
+  address: string
+  detailAddress?: string | null
+  postalCode?: string | null
+  isDefault?: boolean
+}
+
+// 사용자 정보 관련
+export interface UserInfo {
+  id: number
+  email: string
+  name: string
+  point: number
+  money: number
+}
+
+// 거래 내역 관련
+export interface Transaction {
+  transactionId: number
+  userId: number
+  walletId?: number
+  orderId?: number
+  paymentId?: number
+  type: 'CHARGE' | 'PAYMENT' | 'REFUND' | 'POINT_EARNED' | 'POINT_USED'
+  amount: number
+  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
+  idempotencyKey?: string
+  createdAt: string
+}
+
+// 지갑 관련
+export interface WalletInfo {
+  id: number
+  userId: number
+  balance: number
 }

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { memo, useEffect, useCallback } from 'react'
 import './Toast.css'
 
 interface ToastProps {
@@ -8,7 +8,7 @@ interface ToastProps {
   duration?: number
 }
 
-const Toast = ({ message, isVisible, onClose, duration = 2000 }: ToastProps) => {
+const Toast = memo(({ message, isVisible, onClose, duration = 2000 }: ToastProps) => {
   useEffect(() => {
     if (isVisible) {
       const timer = setTimeout(() => {
@@ -29,6 +29,8 @@ const Toast = ({ message, isVisible, onClose, duration = 2000 }: ToastProps) => 
       </div>
     </div>
   )
-}
+})
+
+Toast.displayName = 'Toast'
 
 export default Toast
