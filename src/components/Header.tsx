@@ -11,6 +11,7 @@ interface HeaderProps {
   showSearch?: boolean
   searchQuery?: string
   onSearchChange?: (query: string) => void
+  onSearchSubmit?: (query: string) => void
   showQButton?: boolean
   onLogoutSuccess?: () => void
 }
@@ -19,6 +20,7 @@ const Header = ({
   showSearch = true, 
   searchQuery: externalSearchQuery,
   onSearchChange,
+  onSearchSubmit,
   showQButton = false,
   onLogoutSuccess
 }: HeaderProps) => {
@@ -85,6 +87,19 @@ const Header = ({
     setSearchQuery('')
   }, [setSearchQuery])
 
+  const handleSearchSubmit = useCallback(() => {
+    const q = (externalSearchQuery !== undefined ? externalSearchQuery : internalSearchQuery).trim()
+    if (onSearchSubmit) {
+      onSearchSubmit(q)
+    } else {
+      navigate(q ? `/products?q=${encodeURIComponent(q)}` : '/products')
+    }
+  }, [externalSearchQuery, internalSearchQuery, onSearchSubmit, navigate])
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') handleSearchSubmit()
+  }
+
   return (
     <>
       <div className="product-header">
@@ -104,8 +119,11 @@ const Header = ({
                 placeholder="상품을 검색하세요"
                 value={searchQuery}
                 onChange={handleSearchChange}
+                onKeyDown={handleSearchKeyDown}
               />
-              <button className="search-btn">🔍</button>
+              <button type="button" className="search-btn" onClick={handleSearchSubmit} aria-label="검색">
+                🔍
+              </button>
               {searchQuery && (
                 <button className="clear-btn" onClick={handleClearSearch}>
                   ✕

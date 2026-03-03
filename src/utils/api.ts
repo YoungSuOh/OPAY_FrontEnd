@@ -792,6 +792,66 @@ export const getCategories = async (): Promise<string[]> => {
   return response.json()
 }
 
+// 검색 API (Elasticsearch + Redis, fallback MySQL)
+export interface SearchParams {
+  q?: string
+  category?: string
+  minPrice?: number
+  maxPrice?: number
+  sort?: 'recent' | 'popular' | 'price' | 'rating'
+  order?: 'asc' | 'desc'
+  page?: number
+  size?: number
+}
+
+export const searchProducts = async (params: SearchParams = {}): Promise<ProductListResponse> => {
+  const queryParams = new URLSearchParams()
+  if (params.q) queryParams.append('q', params.q)
+  if (params.category) queryParams.append('category', params.category)
+  if (params.minPrice !== undefined) queryParams.append('minPrice', params.minPrice.toString())
+  if (params.maxPrice !== undefined) queryParams.append('maxPrice', params.maxPrice.toString())
+  queryParams.append('sort', params.sort || 'recent')
+  queryParams.append('order', params.order || 'desc')
+  queryParams.append('page', (params.page ?? 0).toString())
+  queryParams.append('size', (params.size ?? 20).toString())
+
+  const response = await fetch(`${API_BASE_URL}/search?${queryParams.toString()}`, {
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    throw new Error('검색에 실패했습니다.')
+  }
+
+  const data = await response.json()
+  return {
+    ...data,
+    products: (data.products || []).map((p: { id?: number; [key: string]: unknown }) => ({
+      ...p,
+      id: String(p.id),
+    })),
+  }
+}
+
+// 자동완성 (2자 이상)
+export const getSearchAutocomplete = async (q: string): Promise<string[]> => {
+  if (!q || q.trim().length < 2) return []
+  const response = await fetch(`${API_BASE_URL}/search/autocomplete?q=${encodeURIComponent(q.trim())}`, {
+    credentials: 'include',
+  })
+  if (!response.ok) return []
+  return response.json()
+}
+
+// 인기 검색어
+export const getPopularKeywords = async (): Promise<string[]> => {
+  const response = await fetch(`${API_BASE_URL}/search/popular`, {
+    credentials: 'include',
+  })
+  if (!response.ok) return []
+  return response.json()
+}
+
 // 구매 내역 관련 API (page: 1-based, 백엔드는 0-based page + size 사용)
 export const getOrderList = async (page: number = 1, limit: number = 10): Promise<{
   orders: OrderInfo[]

@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useCallback } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useCartStore } from '../store/cartStore'
 import { useAuthStore } from '../store/authStore'
 import { useRecentProductsStore } from '../store/recentProductsStore'
 import { Product } from '../types'
-import { getProducts, getCategories } from '../utils/api'
+import { searchProducts, getCategories, getSearchAutocomplete, getPopularKeywords } from '../utils/api'
+import { debounce } from '../utils/debounce'
 import Button from '../components/Button'
 import CartButton from '../components/CartButton'
 import Header from '../components/Header'
@@ -13,7 +14,7 @@ import Toast from '../components/Toast'
 import AuthModal from '../components/AuthModal'
 import './ProductListPage.css'
 
-const RELATED_KEYWORDS = [
+const FALLBACK_KEYWORDS = [
   '식품',
   '가전/디지털',
   '주방용품',
@@ -26,11 +27,12 @@ const RELATED_KEYWORDS = [
 
 const ProductListPage = () => {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { isLoggedIn } = useAuthStore()
   const { addToCart, getCartItems } = useCartStore()
   const { addRecentProduct } = useRecentProductsStore()
   
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '')
   const [selectedCategory, setSelectedCategory] = useState('전체')
   const [categories, setCategories] = useState<string[]>([])
   const [priceRange, setPriceRange] = useState<{ min: number; max: number } | null>(null)
@@ -42,9 +44,16 @@ const ProductListPage = () => {
   const [totalElements, setTotalElements] = useState(0)
   const [showToast, setShowToast] = useState(false)
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+  const [popularKeywords, setPopularKeywords] = useState<string[]>([])
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<string[]>([])
+  const [showAutocomplete, setShowAutocomplete] = useState(false)
 
   useEffect(() => {
-    // 카테고리 목록 로드
+    const q = searchParams.get('q')
+    setSearchQuery(q || '')
+  }, [searchParams])
+
+  useEffect(() => {
     const loadCategories = async () => {
       try {
         const cats = await getCategories()
@@ -57,40 +66,46 @@ const ProductListPage = () => {
   }, [])
 
   useEffect(() => {
-    // 상품 목록 로드
+    const loadPopularKeywords = async () => {
+      try {
+        const keywords = await getPopularKeywords()
+        setPopularKeywords(keywords.length > 0 ? keywords : FALLBACK_KEYWORDS)
+      } catch {
+        setPopularKeywords(FALLBACK_KEYWORDS)
+      }
+    }
+    loadPopularKeywords()
+  }, [])
+
+  useEffect(() => {
     const loadProducts = async () => {
       setIsLoading(true)
       try {
-        const sortByMap: Record<string, 'created' | 'price' | 'name' | 'rating' | 'reviews'> = {
-          'created': 'created',
+        const sortMap: Record<string, 'recent' | 'popular' | 'price' | 'rating'> = {
+          'created': 'recent',
           'price-low': 'price',
           'price-high': 'price',
-          'reviews': 'reviews',
+          'reviews': 'popular',
           'rating': 'rating',
         }
+        const order = sortBy === 'price-low' ? 'asc' : 'desc'
 
-        const sortDirection = sortBy === 'price-low' ? 'asc' : 'desc'
-
-        const data = await getProducts({
-          keyword: searchQuery || undefined,
+        const data = await searchProducts({
+          q: searchQuery || undefined,
           category: selectedCategory !== '전체' ? selectedCategory : undefined,
           minPrice: priceRange?.min,
           maxPrice: priceRange?.max,
-          sortBy: sortByMap[sortBy],
-          sortDirection,
+          sort: sortMap[sortBy],
+          order,
           page,
           size: 20,
         })
 
         setFilteredProducts(data.products)
         setTotalElements(data.totalElements)
-
-        // 최근 본 상품에 추가
-        data.products.forEach((product) => {
-          addRecentProduct(product.id)
-        })
+        data.products.forEach((product) => addRecentProduct(product.id))
       } catch (error) {
-        console.error('상품 목록 로드 실패:', error)
+        console.error('검색 실패:', error)
         setFilteredProducts([])
       } finally {
         setIsLoading(false)
@@ -99,6 +114,49 @@ const ProductListPage = () => {
 
     loadProducts()
   }, [searchQuery, selectedCategory, priceRange, sortBy, page, addRecentProduct])
+
+  const fetchAutocomplete = useCallback(
+    debounce(async (query: string) => {
+      if (!query || query.trim().length < 2) {
+        setAutocompleteSuggestions([])
+        return
+      }
+      try {
+        const suggestions = await getSearchAutocomplete(query)
+        setAutocompleteSuggestions(suggestions)
+        setShowAutocomplete(true)
+      } catch {
+        setAutocompleteSuggestions([])
+      }
+    }, 300),
+    []
+  )
+
+  useEffect(() => {
+    if (!searchQuery || searchQuery.trim().length < 2) {
+      setAutocompleteSuggestions([])
+      setShowAutocomplete(false)
+      return
+    }
+    fetchAutocomplete(searchQuery)
+  }, [searchQuery, fetchAutocomplete])
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const wrapper = document.querySelector('.search-area-wrapper')
+      if (showAutocomplete && wrapper && !wrapper.contains(e.target as Node)) {
+        setShowAutocomplete(false)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [showAutocomplete])
+
+  const handleSelectSuggestion = (suggestion: string) => {
+    setSearchQuery(suggestion)
+    setShowAutocomplete(false)
+    setAutocompleteSuggestions([])
+  }
 
   const handleAddToCart = async (product: Product) => {
     try {
@@ -144,28 +202,46 @@ const ProductListPage = () => {
   return (
     <div className="product-list-page">
       {/* 상단 검색 바 */}
-      <Header 
-        showSearch={true}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        showQButton={false}
-      />
+      <div className="search-area-wrapper">
+        <Header 
+          showSearch={true}
+          searchQuery={searchQuery}
+          onSearchChange={(q) => {
+            setSearchQuery(q)
+            if (!q) setShowAutocomplete(false)
+          }}
+          showQButton={false}
+        />
+        {/* 자동완성 드롭다운 */}
+        {showAutocomplete && autocompleteSuggestions.length > 0 && (
+          <ul className="autocomplete-list" role="listbox">
+            {autocompleteSuggestions.map((s) => (
+              <li
+                key={s}
+                role="option"
+                className="autocomplete-item"
+                onMouseDown={(e) => { e.preventDefault(); handleSelectSuggestion(s) }}
+              >
+                {s}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
-      {/* 연관 키워드 */}
-      {searchQuery && (
-        <div className="related-keywords">
-          <span className="related-label">연관</span>
-          {RELATED_KEYWORDS.map((keyword) => (
-            <button
-              key={keyword}
-              className="keyword-tag"
-              onClick={() => setSearchQuery(keyword)}
-            >
-              {keyword}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* 인기/연관 검색어 */}
+      <div className="related-keywords">
+        <span className="related-label">{searchQuery ? '연관' : '인기 검색어'}</span>
+        {popularKeywords.map((keyword) => (
+          <button
+            key={keyword}
+            className="keyword-tag"
+            onClick={() => setSearchQuery(keyword)}
+          >
+            {keyword}
+          </button>
+        ))}
+      </div>
 
       <div className="product-content">
         {/* 필터 사이드바 */}
