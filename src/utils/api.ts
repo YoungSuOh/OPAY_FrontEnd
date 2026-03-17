@@ -43,7 +43,10 @@ async function authFetch(
   init?: RequestInit & { _retry?: boolean }
 ): Promise<Response> {
   const { _retry, ...fetchInit } = init ?? {}
-  const headers = { ...getAuthHeaders(), ...(fetchInit.headers as Record<string, string>) }
+  const token = getAccessToken()
+  const headers: HeadersInit = fetchInit.body instanceof FormData
+    ? (token ? { Authorization: `Bearer ${token}` } : {})
+    : { ...getAuthHeaders(), ...(fetchInit.headers as Record<string, string>) }
   const res = await fetch(input, { ...fetchInit, headers })
   if (res.status !== 401 && res.status !== 403) return res
   if (_retry) {
@@ -109,6 +112,7 @@ export interface AuthResponse {
   userId: number
   email: string
   name: string
+  role?: string  // USER, ADMIN
   accessToken: string
 }
 
@@ -1211,5 +1215,318 @@ export const getTransactions = async (page: number = 0, size: number = 20): Prom
     pageSize: data.size || size,
     hasNext: !data.last || false,
     hasPrevious: !data.first || false,
+  }
+}
+
+// ---------- 관리자 API (Admin role 필요) ----------
+export interface AdminDashboardStats {
+  totalUsers: number
+  totalProducts: number
+  totalOrders: number
+  totalPaymentsSuccess: number
+  pendingRefundCount: number
+}
+
+export const getAdminDashboard = async (): Promise<AdminDashboardStats> => {
+  const response = await authFetch(`${API_BASE_URL}/admin/dashboard`, { credentials: 'include' })
+  if (!response.ok) throw new Error('대시보드 조회에 실패했습니다.')
+  return response.json()
+}
+
+export interface AdminMemberItem {
+  id: number
+  email: string
+  name: string
+  phone: string | null
+  role: string
+  createdAt: string
+}
+
+export interface AdminMemberListRes {
+  members: AdminMemberItem[]
+  totalElements: number
+  totalPages: number
+  currentPage: number
+  pageSize: number
+  hasNext: boolean
+  hasPrevious: boolean
+}
+
+export const getAdminMembers = async (keyword?: string, page = 0, size = 20): Promise<AdminMemberListRes> => {
+  const params = new URLSearchParams()
+  if (keyword) params.append('keyword', keyword)
+  params.append('page', String(page))
+  params.append('size', String(size))
+  const response = await authFetch(`${API_BASE_URL}/admin/members?${params}`, { credentials: 'include' })
+  if (!response.ok) throw new Error('회원 목록 조회에 실패했습니다.')
+  return response.json()
+}
+
+export interface AdminMemberDetail {
+  id: number
+  email: string
+  name: string
+  phone: string | null
+  role: string
+  walletBalance: number
+  orderCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export const getAdminMemberDetail = async (id: number): Promise<AdminMemberDetail> => {
+  const response = await authFetch(`${API_BASE_URL}/admin/members/${id}`, { credentials: 'include' })
+  if (!response.ok) throw new Error('회원 상세 조회에 실패했습니다.')
+  return response.json()
+}
+
+export const updateAdminMember = async (id: number, data: { name?: string; phone?: string }): Promise<AdminMemberItem> => {
+  const response = await authFetch(`${API_BASE_URL}/admin/members/${id}`, {
+    method: 'PUT',
+    credentials: 'include',
+    body: JSON.stringify(data),
+  })
+  if (!response.ok) throw new Error('회원 수정에 실패했습니다.')
+  return response.json()
+}
+
+export interface AdminOrderItem {
+  id: number
+  userId: number
+  userName: string
+  totalAmount: number
+  paidAmount: number
+  status: string
+  items: Array<{ id: number; productId: number; productName: string; quantity: number; price: number; totalPrice: number }>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AdminOrderListRes {
+  orders: AdminOrderItem[]
+  totalElements: number
+  totalPages: number
+  currentPage: number
+  pageSize: number
+  hasNext: boolean
+  hasPrevious: boolean
+}
+
+export const getAdminOrders = async (
+  page = 0,
+  size = 20,
+  params?: { orderId?: number; userId?: number; keyword?: string }
+): Promise<AdminOrderListRes> => {
+  const searchParams = new URLSearchParams()
+  searchParams.append('page', String(page))
+  searchParams.append('size', String(size))
+  if (params?.orderId != null) searchParams.append('orderId', String(params.orderId))
+  if (params?.userId != null) searchParams.append('userId', String(params.userId))
+  if (params?.keyword) searchParams.append('keyword', params.keyword)
+  const response = await authFetch(`${API_BASE_URL}/admin/orders?${searchParams}`, { credentials: 'include' })
+  if (!response.ok) throw new Error('주문 목록 조회에 실패했습니다.')
+  return response.json()
+}
+
+export const getAdminOrderDetail = async (id: number): Promise<AdminOrderItem> => {
+  const response = await authFetch(`${API_BASE_URL}/admin/orders/${id}`, { credentials: 'include' })
+  if (!response.ok) throw new Error('주문 상세 조회에 실패했습니다.')
+  return response.json()
+}
+
+export const updateAdminOrderStatus = async (id: number, status: string): Promise<AdminOrderItem> => {
+  const response = await authFetch(`${API_BASE_URL}/admin/orders/${id}/status?status=${encodeURIComponent(status)}`, {
+    method: 'PATCH',
+    credentials: 'include',
+  })
+  if (!response.ok) throw new Error('주문 상태 변경에 실패했습니다.')
+  return response.json()
+}
+
+export const cancelAdminOrder = async (id: number): Promise<void> => {
+  const response = await authFetch(`${API_BASE_URL}/admin/orders/${id}/cancel`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  if (!response.ok) throw new Error('주문 취소에 실패했습니다.')
+}
+
+export interface AdminPaymentItem {
+  paymentId: number
+  orderId: number
+  userId: number
+  userEmail: string
+  amount: number
+  method: string
+  status: string
+  approvedAt: string | null
+  createdAt: string
+}
+
+export interface AdminPaymentListRes {
+  payments: AdminPaymentItem[]
+  totalElements: number
+  totalPages: number
+  currentPage: number
+  pageSize: number
+  hasNext: boolean
+  hasPrevious: boolean
+}
+
+export const getAdminPayments = async (
+  page = 0,
+  size = 20,
+  params?: { orderId?: number; userId?: number; keyword?: string }
+): Promise<AdminPaymentListRes> => {
+  const searchParams = new URLSearchParams()
+  searchParams.append('page', String(page))
+  searchParams.append('size', String(size))
+  if (params?.orderId != null) searchParams.append('orderId', String(params.orderId))
+  if (params?.userId != null) searchParams.append('userId', String(params.userId))
+  if (params?.keyword) searchParams.append('keyword', params.keyword)
+  const response = await authFetch(`${API_BASE_URL}/admin/payments?${searchParams}`, { credentials: 'include' })
+  if (!response.ok) throw new Error('결제 목록 조회에 실패했습니다.')
+  return response.json()
+}
+
+export const getAdminPaymentsByUser = async (userId: number, page = 0, size = 20): Promise<AdminPaymentListRes> => {
+  const response = await authFetch(`${API_BASE_URL}/admin/payments/user/${userId}?page=${page}&size=${size}`, { credentials: 'include' })
+  if (!response.ok) throw new Error('회원 결제 목록 조회에 실패했습니다.')
+  return response.json()
+}
+
+export interface AdminRefundItem {
+  id: number
+  orderId: number
+  paymentId: number | null
+  amount: number
+  reason: string | null
+  status: string
+  requestedByUserId: number
+  requestedByEmail: string
+  processedAt: string | null
+  processedByUserId: number | null
+  createdAt: string
+}
+
+export interface AdminRefundListRes {
+  refunds: AdminRefundItem[]
+  totalElements: number
+  totalPages: number
+  currentPage: number
+  pageSize: number
+  hasNext: boolean
+  hasPrevious: boolean
+}
+
+export const getAdminRefunds = async (status?: string, page = 0, size = 20): Promise<AdminRefundListRes> => {
+  const params = new URLSearchParams()
+  if (status) params.append('status', status)
+  params.append('page', String(page))
+  params.append('size', String(size))
+  const response = await authFetch(`${API_BASE_URL}/admin/refunds?${params}`, { credentials: 'include' })
+  if (!response.ok) throw new Error('환불 목록 조회에 실패했습니다.')
+  return response.json()
+}
+
+export const approveAdminRefund = async (id: number): Promise<AdminRefundItem> => {
+  const response = await authFetch(`${API_BASE_URL}/admin/refunds/${id}/approve`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  if (!response.ok) throw new Error('환불 승인에 실패했습니다.')
+  return response.json()
+}
+
+export const rejectAdminRefund = async (id: number): Promise<AdminRefundItem> => {
+  const response = await authFetch(`${API_BASE_URL}/admin/refunds/${id}/reject`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  if (!response.ok) throw new Error('환불 거절에 실패했습니다.')
+  return response.json()
+}
+
+// 관리자 상품 이미지 업로드 (S3)
+export const uploadAdminProductImage = async (
+  file: File,
+  productId?: number
+): Promise<{ imageUrl: string }> => {
+  const formData = new FormData()
+  formData.append('file', file)
+  if (productId != null) formData.append('productId', String(productId))
+  const response = await authFetch(`${API_BASE_URL}/admin/products/upload-image`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  })
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}))
+    throw new Error(err.message || '이미지 업로드에 실패했습니다.')
+  }
+  return response.json()
+}
+
+// 관리자 상품: 기존 getProducts, getProduct, getCategories 사용 + create/update/delete는 admin 경로
+export const createAdminProduct = async (data: {
+  name: string
+  description?: string
+  price: number
+  stock?: number
+  category?: string
+  imageUrl?: string
+}): Promise<Product> => {
+  const response = await authFetch(`${API_BASE_URL}/admin/products`, {
+    method: 'POST',
+    credentials: 'include',
+    body: JSON.stringify(data),
+  })
+  if (!response.ok) throw new Error('상품 등록에 실패했습니다.')
+  const p = await response.json()
+  return { ...p, id: String(p.id) }
+}
+
+export const updateAdminProduct = async (id: number, data: {
+  name?: string
+  description?: string
+  price?: number
+  stock?: number
+  category?: string
+  imageUrl?: string
+}): Promise<Product> => {
+  const response = await authFetch(`${API_BASE_URL}/admin/products/${id}`, {
+    method: 'PUT',
+    credentials: 'include',
+    body: JSON.stringify(data),
+  })
+  if (!response.ok) throw new Error('상품 수정에 실패했습니다.')
+  const p = await response.json()
+  return { ...p, id: String(p.id) }
+}
+
+export const deleteAdminProduct = async (id: number): Promise<void> => {
+  const response = await authFetch(`${API_BASE_URL}/admin/products/${id}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!response.ok) throw new Error('상품 삭제에 실패했습니다.')
+}
+
+export const getAdminProducts = async (params: ProductListParams = {}): Promise<ProductListResponse> => {
+  const queryParams = new URLSearchParams()
+  if (params.keyword) queryParams.append('keyword', params.keyword)
+  if (params.category) queryParams.append('category', params.category)
+  if (params.minPrice !== undefined) queryParams.append('minPrice', params.minPrice.toString())
+  if (params.maxPrice !== undefined) queryParams.append('maxPrice', params.maxPrice.toString())
+  queryParams.append('sortBy', params.sortBy || 'created')
+  queryParams.append('sortDirection', params.sortDirection || 'desc')
+  queryParams.append('page', String(params.page ?? 0))
+  queryParams.append('size', String(params.size ?? 20))
+  const response = await authFetch(`${API_BASE_URL}/admin/products?${queryParams}`, { credentials: 'include' })
+  if (!response.ok) throw new Error('상품 목록 조회에 실패했습니다.')
+  const data = await response.json()
+  return {
+    ...data,
+    products: (data.products || []).map((p: { id?: number }) => ({ ...p, id: String(p.id) })),
   }
 }

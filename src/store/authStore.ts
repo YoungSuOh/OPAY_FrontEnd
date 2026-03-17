@@ -8,6 +8,7 @@ interface AuthState {
     id: string
     email: string
     name: string
+    role?: string
   } | null
   accessToken: string | null
 
@@ -40,6 +41,7 @@ export const useAuthStore = create<AuthState>()(
               id: response.userId.toString(),
               email: response.email,
               name: response.name,
+              role: response.role,
             },
             accessToken: response.accessToken,
           })
@@ -84,6 +86,7 @@ export const useAuthStore = create<AuthState>()(
               id: response.userId.toString(),
               email: response.email,
               name: response.name,
+              role: response.role,
             },
             accessToken: response.accessToken,
           })
@@ -100,7 +103,8 @@ export const useAuthStore = create<AuthState>()(
           user: {
             id: authResponse.userId.toString(),
             email: authResponse.email,
-            name: authResponse.name,
+            name: authResponse.name ?? '',
+            role: authResponse.role,
           },
           accessToken: authResponse.accessToken,
         })

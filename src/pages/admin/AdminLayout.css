@@ -1,0 +1,474 @@
+/* OPay 메인과 동일한 sky-blue 변수 사용 (index.css 상속) */
+
+.admin-layout {
+  display: flex;
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--sky-blue-50) 0%, var(--sky-blue-100) 100%);
+}
+
+.admin-sidebar {
+  width: 240px;
+  background: white;
+  border-right: 1px solid #e2e8f0;
+  padding: 1.25rem 0;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.admin-sidebar h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--sky-blue-600);
+  padding: 0 1.25rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 0.5rem;
+}
+
+.admin-sidebar nav a {
+  display: block;
+  padding: 0.7rem 1.25rem;
+  color: #64748b;
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: background 0.2s, color 0.2s;
+}
+
+.admin-sidebar nav a:hover {
+  background: var(--sky-blue-50);
+  color: var(--sky-blue-700);
+}
+
+.admin-sidebar nav a.active {
+  background: var(--sky-blue-100);
+  color: var(--sky-blue-700);
+  font-weight: 600;
+}
+
+.admin-main {
+  flex: 1;
+  padding: 1.5rem 2rem;
+  overflow: auto;
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.admin-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--sky-blue-800);
+}
+
+.admin-header .admin-user {
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.admin-header .admin-user button {
+  margin-left: 0.75rem;
+  padding: 0.4rem 0.9rem;
+  background: #f1f5f9;
+  color: #64748b;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.admin-header .admin-user button:hover {
+  background: var(--sky-blue-100);
+  color: var(--sky-blue-700);
+}
+
+/* OPay 카드 스타일 (special-deals-section 유사) */
+.admin-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.1);
+}
+
+.admin-card h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--sky-blue-800);
+  margin-bottom: 1rem;
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.admin-table th {
+  font-weight: 600;
+  color: var(--sky-blue-800);
+  background: #f8fafc;
+}
+
+.admin-table tr:hover td {
+  background: #f8fafc;
+}
+
+.admin-table .actions button {
+  margin-right: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.admin-table .actions button:not(.btn-danger) {
+  background: var(--sky-blue-100);
+  color: var(--sky-blue-700);
+}
+
+.admin-table .actions button:not(.btn-danger):hover {
+  background: var(--sky-blue-200);
+}
+
+.admin-table .actions button.btn-danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.admin-table .actions button.btn-danger:hover {
+  background: #fecaca;
+}
+
+/* OPay 대시보드 통계 카드 */
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.admin-stat {
+  background: white;
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.1);
+}
+
+.admin-stat .label {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-bottom: 0.35rem;
+  font-weight: 500;
+}
+
+.admin-stat .value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--sky-blue-800);
+}
+
+/* OPay 버튼 스타일 */
+.admin-btn-primary {
+  padding: 0.6rem 1.2rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 8px;
+  background: var(--sky-blue-600);
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.admin-btn-primary:hover:not(:disabled) {
+  background: var(--sky-blue-700);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+}
+
+.admin-btn-secondary {
+  padding: 0.6rem 1.2rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #64748b;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.admin-btn-secondary:hover {
+  color: var(--sky-blue-600);
+  background: var(--sky-blue-50);
+}
+
+/* 검색/필터 폼 */
+.admin-search-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 1.25rem;
+}
+
+.admin-search-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.admin-search-form .form-group label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.admin-search-form input,
+.admin-search-form select {
+  padding: 0.5rem 0.75rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  min-width: 140px;
+}
+
+.admin-search-form input:focus {
+  border-color: var(--sky-blue-600);
+  outline: none;
+}
+
+.pagination {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.pagination button {
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: #f1f5f9;
+  color: #64748b;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination button:hover:not(:disabled) {
+  background: var(--sky-blue-100);
+  color: var(--sky-blue-700);
+}
+
+.pagination span {
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.form-row {
+  margin-bottom: 1rem;
+}
+
+.form-row label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--sky-blue-800);
+  margin-bottom: 0.35rem;
+}
+
+.form-row input,
+.form-row textarea {
+  width: 100%;
+  max-width: 400px;
+  padding: 0.55rem 0.75rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.form-row input:focus,
+.form-row textarea:focus {
+  border-color: var(--sky-blue-600);
+  outline: none;
+}
+
+.form-actions {
+  margin-top: 1.25rem;
+}
+
+.form-actions button {
+  margin-right: 0.5rem;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.form-actions button.primary {
+  background: var(--sky-blue-600);
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.form-actions button.primary:hover {
+  background: var(--sky-blue-700);
+}
+
+.form-actions button.secondary {
+  background: #f1f5f9;
+  color: #64748b;
+  border: none;
+  cursor: pointer;
+}
+
+.form-actions button.secondary:hover {
+  background: #e2e8f0;
+}
+
+.form-actions button.btn-danger {
+  background: #ef4444;
+  color: white;
+}
+
+.form-actions button.btn-danger:hover {
+  background: #dc2626;
+}
+
+.admin-error {
+  color: #b91c1c;
+  font-size: 0.875rem;
+  margin-bottom: 0.75rem;
+}
+
+/* 상품 이미지 업로드 */
+.admin-product-image-upload {
+  margin-top: 0.25rem;
+}
+
+.admin-product-image-preview {
+  margin-bottom: 0.5rem;
+}
+
+.admin-product-image-preview img {
+  max-width: 200px;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.admin-image-hint,
+.admin-image-placeholder {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-top: 0.35rem;
+}
+
+/* 주문 상세 모달 */
+.admin-order-detail {
+  max-width: 560px;
+  width: 90%;
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.admin-order-detail .order-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--sky-blue-100);
+}
+
+.admin-order-detail .order-detail-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--sky-blue-800);
+  margin: 0;
+}
+
+.admin-order-detail .order-detail-badge {
+  display: inline-block;
+  padding: 0.35rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.admin-order-detail .order-detail-badge.PENDING { background: #fef3c7; color: #92400e; }
+.admin-order-detail .order-detail-badge.CONFIRMED { background: #dbeafe; color: #1e40af; }
+.admin-order-detail .order-detail-badge.PREPARING { background: #e0e7ff; color: #3730a3; }
+.admin-order-detail .order-detail-badge.SHIPPED { background: #cffafe; color: #0e7490; }
+.admin-order-detail .order-detail-badge.DELIVERED { background: #d1fae5; color: #065f46; }
+.admin-order-detail .order-detail-badge.CANCELLED { background: #fee2e2; color: #b91c1c; }
+
+.admin-order-detail .order-detail-section {
+  margin-bottom: 1.25rem;
+}
+
+.admin-order-detail .order-detail-section h4 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--sky-blue-800);
+  margin-bottom: 0.5rem;
+}
+
+.admin-order-detail .order-detail-info {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.admin-order-detail .order-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.admin-order-detail .order-items-table th,
+.admin-order-detail .order-items-table td {
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.admin-order-detail .order-items-table th {
+  background: #f8fafc;
+  font-weight: 600;
+  color: var(--sky-blue-800);
+}
+
+.admin-order-detail .order-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}

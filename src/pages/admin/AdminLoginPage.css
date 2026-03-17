@@ -1,0 +1,54 @@
+.admin-login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--sky-blue-50) 0%, var(--sky-blue-100) 100%);
+}
+
+.admin-login-card {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.15);
+  width: 100%;
+  max-width: 400px;
+}
+
+.admin-login-card h1 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--sky-blue-800);
+  margin-bottom: 1.5rem;
+}
+
+.admin-login-error {
+  color: #b91c1c;
+  font-size: 0.875rem;
+  margin-bottom: 0.75rem;
+}
+
+.admin-login-card .form-row input {
+  max-width: 100%;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+}
+
+.admin-login-card .form-row input:focus {
+  border-color: var(--sky-blue-600);
+  outline: none;
+}
+
+.admin-login-card .form-actions button.primary {
+  background: var(--sky-blue-600);
+  color: white;
+  padding: 0.65rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 600;
+  width: 100%;
+}
+
+.admin-login-card .form-actions button.primary:hover:not(:disabled) {
+  background: var(--sky-blue-700);
+}
